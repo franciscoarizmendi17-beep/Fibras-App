@@ -4,205 +4,133 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FIBRAS · Sistema de Inversión</title>
-<!-- Firebase CDN -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<!-- Firebase Compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAjmsv0urVnUuVHho8aQTjxDfOKOHbufV0",
+  authDomain: "fibras-app.firebaseapp.com",
+  projectId: "fibras-app",
+  storageBucket: "fibras-app.firebasestorage.app",
+  messagingSenderId: "10238263332",
+  appId: "1:10238263332:web:ebca0a51a445f040dd58b1"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+const AV_KEY = '1FBQIUMATVPSMZVF';
+const chartCache = {};
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyAjmsv0urVnUuVHho8aQTjxDfOKOHbufV0",
-    authDomain: "fibras-app.firebaseapp.com",
-    projectId: "fibras-app",
-    storageBucket: "fibras-app.firebasestorage.app",
-    messagingSenderId: "10238263332",
-    appId: "1:10238263332:web:ebca0a51a445f040dd58b1"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  // Sesión permanente — no pide login cada vez que abres la app
-  await setPersistence(auth, browserLocalPersistence);
-  const db = getFirestore(app);
-
-  // ── AUTH STATE ──
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display = 'flex';
-      document.getElementById('user-email').textContent = user.email;
-      await loadUserData(user.uid);
-      fetchPrices();
-    } else {
-      document.getElementById('login-screen').style.display = 'flex';
-      document.getElementById('app-screen').style.display = 'none';
-    }
-  });
-
-  // ── LOGIN ──
-  window.doLogin = async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-pass').value;
-    const err = document.getElementById('login-err');
-    err.textContent = '';
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch(e) {
-      err.textContent = 'Correo o contraseña incorrectos.';
-    }
-  };
-
-  // ── REGISTRO ──
-  window.doRegister = async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-pass').value;
-    const err = document.getElementById('login-err');
-    err.textContent = '';
-    if (pass.length < 6) { err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, 'usuarios', cred.user.uid), { email, compras: [], ventas: [], dividendos: [], notas: [] });
-    } catch(e) {
-      if (e.code === 'auth/email-already-in-use') err.textContent = 'Ese correo ya tiene cuenta. Inicia sesión.';
-      else err.textContent = 'Error al crear cuenta: ' + e.message;
-    }
-  };
-
-  // ── LOGOUT ──
-  window.doLogout = async () => { await signOut(auth); };
-
-  // ── LOAD DATA ──
-  window._db = db;
-  window._auth = auth;
-  window._doc = doc;
-  window._setDoc = setDoc;
-  window._updateDoc = updateDoc;
-  window._arrayUnion = arrayUnion;
-  window._getDoc = getDoc;
-
-  async function loadUserData(uid) {
-    const ref = doc(db, 'usuarios', uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      window.compras = data.compras || [];
-      window.ventas = data.ventas || [];
-      window.dividendos = data.dividendos || [];
-      renderHistorial();
-      renderPosiciones();
-      renderDividendos();
-    } else {
-      await setDoc(ref, { email: auth.currentUser.email, compras: [], ventas: [], dividendos: [], notas: [] });
-      window.compras = [];
-      window.ventas = [];
-      window.dividendos = [];
-    }
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'flex';
+    document.getElementById('user-email').textContent = user.email;
+    await loadUserData(user.uid);
+    fetchPrices();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
   }
+});
 
-  // ── SAVE TO FIRESTORE ──
-  window.saveCompra = async (compra) => {
-    const uid = auth.currentUser.uid;
-    await updateDoc(doc(db, 'usuarios', uid), { compras: arrayUnion(compra) });
-  };
+function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  err.textContent = '';
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(() => { err.textContent = 'Correo o contraseña incorrectos.'; });
+}
 
-  window.saveVenta = async (venta) => {
-    const uid = auth.currentUser.uid;
-    await updateDoc(doc(db, 'usuarios', uid), { ventas: arrayUnion(venta) });
-  };
-
-  window.saveDividendo = async (div) => {
-    const uid = auth.currentUser.uid;
-    await updateDoc(doc(db, 'usuarios', uid), { dividendos: arrayUnion(div) });
-  };
-
-  // ── FETCH PRICES (Alpha Vantage fallback to static) ──
-  const AV_KEY = '1FBQIUMATVPSMZVF';
-
-  // All 16 FIBRAs with their BMV tickers for Alpha Vantage
-  const FIBRA_TICKERS = [
-    'FUNO11.MX','FMTY14.MX','DANHOS13.MX','FSHOP13.MX',
-    'FIBRAPL14.MX','FNOVA17.MX','NEXT25.MX','EDUCA18.MX',
-    'TERRA13.MX','FHIPO14.MX','STORAGE18.MX','FMX23.MX',
-    'FCFE18.MX','FINN13.MX','FIHO12.MX','FPLUS16.MX'
-  ];
-
-  async function fetchSingleAV(symbol) {
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${AV_KEY}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const quote = data['Global Quote'];
-    if (quote && quote['05. price']) {
-      return parseFloat(quote['05. price']);
-    }
-    return null;
-  }
-
-  async function fetchPrices() {
-    const el = document.getElementById('last-update');
-    if (el) el.textContent = 'Actualizando precios...';
-
-    const prices = {};
-    let fetched = 0;
-
-    // Alpha Vantage: fetch up to 8 tickers (25/day limit, so we prioritize top FIBRAs)
-    // On free plan: 25 requests/day, so we fetch the 8 most important
-    const priority = ['FUNO11.MX','FMTY14.MX','DANHOS13.MX','FSHOP13.MX','FIBRAPL14.MX','FNOVA17.MX','NEXT25.MX','EDUCA18.MX'];
-
-    for (const symbol of priority) {
-      try {
-        const price = await fetchSingleAV(symbol);
-        if (price && price > 0) {
-          const ticker = symbol.replace('.MX','');
-          prices[ticker] = price;
-          fetched++;
-        }
-        // Small delay to avoid rate limiting
-        await new Promise(r => setTimeout(r, 200));
-      } catch(e) {
-        console.log('AV fetch failed for', symbol);
-      }
-    }
-
-    // Fallback: Yahoo Finance for any tickers not fetched
-    if (fetched < priority.length) {
-      try {
-        const missing = priority.filter(s => !prices[s.replace('.MX','')]).join(',');
-        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${missing}&range=1d&interval=1d`)}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        const data = JSON.parse(json.contents);
-        if (data?.spark?.result) {
-          data.spark.result.forEach(r => {
-            if (r?.response?.[0]?.meta?.regularMarketPrice) {
-              const ticker = r.symbol.replace('.MX','');
-              if (!prices[ticker]) prices[ticker] = r.response[0].meta.regularMarketPrice;
-            }
-          });
-        }
-      } catch(e) {
-        console.log('Yahoo fallback also failed, using static prices');
-      }
-    }
-
-    window.livePrices = prices;
-    updatePriceDisplay(prices);
-    renderPosiciones();
-
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
-    const count = Object.keys(prices).length;
-    if (el) el.textContent = count > 0
-      ? `Precios actualizados ${timeStr} · ${count} FIBRAs en vivo`
-      : `Precios estáticos (sin conexión) · ${timeStr}`;
-  }
-
-  function updatePriceDisplay(prices) {
-    // Update screening cards if prices available
-    Object.entries(prices).forEach(([ticker, price]) => {
-      const el = document.getElementById('price-' + ticker);
-      if (el) el.textContent = '$' + price.toFixed(2);
+function doRegister() {
+  const email = document.getElementById('login-email').value;
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  err.textContent = '';
+  if (pass.length < 6) { err.textContent = 'Contraseña mínimo 6 caracteres.'; return; }
+  auth.createUserWithEmailAndPassword(email, pass)
+    .then(cred => db.collection('usuarios').doc(cred.user.uid).set({
+      email, compras: [], ventas: [], dividendos: [], notas: []
+    }))
+    .catch(e => {
+      if (e.code === 'auth/email-already-in-use') err.textContent = 'Ese correo ya tiene cuenta.';
+      else err.textContent = 'Error: ' + e.message;
     });
+}
+
+function doLogout() { auth.signOut(); }
+
+async function loadUserData(uid) {
+  const snap = await db.collection('usuarios').doc(uid).get();
+  if (snap.exists) {
+    const data = snap.data();
+    window.compras = data.compras || [];
+    window.ventas = data.ventas || [];
+    window.dividendos = data.dividendos || [];
+    if (typeof renderHistorial === 'function') renderHistorial();
+    if (typeof renderPosiciones === 'function') renderPosiciones();
+    if (typeof renderDividendos === 'function') renderDividendos();
+  } else {
+    await db.collection('usuarios').doc(uid).set({
+      email: auth.currentUser.email, compras: [], ventas: [], dividendos: [], notas: []
+    });
+    window.compras = []; window.ventas = []; window.dividendos = [];
   }
+}
+
+function saveCompra(c) {
+  const uid = auth.currentUser?.uid;
+  if (uid) db.collection('usuarios').doc(uid).update({ compras: firebase.firestore.FieldValue.arrayUnion(c) });
+}
+function saveVenta(v) {
+  const uid = auth.currentUser?.uid;
+  if (uid) db.collection('usuarios').doc(uid).update({ ventas: firebase.firestore.FieldValue.arrayUnion(v) });
+}
+function saveDividendo(d) {
+  const uid = auth.currentUser?.uid;
+  if (uid) db.collection('usuarios').doc(uid).update({ dividendos: firebase.firestore.FieldValue.arrayUnion(d) });
+}
+
+async function fetchPrices() {
+  const el = document.getElementById('last-update');
+  if (el) el.textContent = 'Actualizando precios...';
+  const tickers = ['FUNO11.MX','FMTY14.MX','DANHOS13.MX','FSHOP13.MX','FIBRAPL14.MX','FNOVA17.MX','NEXT25.MX','EDUCA18.MX'];
+  const prices = {};
+  for (const s of tickers) {
+    try {
+      const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${s}&apikey=${AV_KEY}`);
+      const d = await res.json();
+      const q = d['Global Quote'];
+      if (q && q['05. price']) prices[s.replace('.MX','')] = parseFloat(q['05. price']);
+      await new Promise(r => setTimeout(r, 200));
+    } catch(e) {}
+  }
+  window.livePrices = prices;
+  if (typeof renderPosiciones === 'function') renderPosiciones();
+  const now = new Date();
+  const t = now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  const c = Object.keys(prices).length;
+  if (el) el.textContent = c > 0 ? `Precios actualizados ${t} · ${c} en vivo` : `Precios estáticos · ${t}`;
+}
+
+async function fetchChartData(ticker) {
+  const cached = chartCache[ticker];
+  if (cached && (Date.now() - cached.ts) < 3600000) return cached.data;
+  try {
+    const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${ticker}.MX&outputsize=compact&apikey=${AV_KEY}`);
+    const json = await res.json();
+    const series = json['Time Series (Daily)'];
+    if (!series) return null;
+    const data = Object.entries(series).slice(0,90).reverse()
+      .map(([date,vals]) => ({time:date, value:parseFloat(vals['5. adjusted close'])}));
+    chartCache[ticker] = {data, ts:Date.now()};
+    return data;
+  } catch(e) { return null; }
+}
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -1349,7 +1277,7 @@ function registrarCompra() {
   if (!fecha || !monto) return alert('Ingresa fecha y monto.');
   const compra = { fecha, monto, fibra, precio, cbfis, ts: Date.now() };
   window.compras.push(compra);
-  if (window.saveCompra) window.saveCompra(compra);
+  if (typeof saveCompra === 'function') saveCompra(compra);
   renderHistorial();
   renderPosiciones();
   closeModal('modal-aportacion');
@@ -1363,7 +1291,7 @@ function registrarVenta() {
   if (!fecha || !cbfis || !precio) return alert('Completa todos los campos.');
   const venta = { fecha, fibra, cbfis, precio, total: cbfis * precio, ts: Date.now() };
   window.ventas.push(venta);
-  if (window.saveVenta) window.saveVenta(venta);
+  if (typeof saveVenta === 'function') saveVenta(venta);
   renderHistorial();
   renderPosiciones();
   closeModal('modal-venta');
@@ -1657,7 +1585,7 @@ function registrarDividendo() {
   const neto = total - isr;
   const div = { fibra, fecha, cbfis, dist, tipo, total, isr, neto, ts: Date.now() };
   window.dividendos.push(div);
-  if (window.saveDividendo) window.saveDividendo(div);
+  if (typeof saveDividendo === 'function') saveDividendo(div);
   renderDividendos();
   closeModal('modal-dividendo');
   // Reset preview
@@ -1747,9 +1675,6 @@ async function setupBiometrics() {
 }
 
 // ── CHART — Lightweight Charts + Alpha Vantage + Cache ──
-const chartCache = {}; // { ticker: { data: [...], ts: timestamp } }
-const CACHE_TTL = 60 * 60 * 1000; // 1 hora
-
 const FIBRA_SECTORS_CHART = {
   FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
   EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
@@ -1758,35 +1683,6 @@ const FIBRA_SECTORS_CHART = {
 };
 
 let openChart = null;
-
-async function fetchChartData(ticker) {
-  // Check cache first
-  const cached = chartCache[ticker];
-  if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
-    return cached.data;
-  }
-
-  try {
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${ticker}.MX&outputsize=compact&apikey=${AV_KEY}`;
-    const res = await fetch(url);
-    const json = await res.json();
-    const series = json['Time Series (Daily)'];
-    if (!series) return null;
-
-    const data = Object.entries(series)
-      .slice(0, 90)
-      .reverse()
-      .map(([date, vals]) => ({
-        time: date,
-        value: parseFloat(vals['5. adjusted close'])
-      }));
-
-    chartCache[ticker] = { data, ts: Date.now() };
-    return data;
-  } catch(e) {
-    return null;
-  }
-}
 
 function calcPerf(data, days) {
   if (!data || data.length < 2) return null;
