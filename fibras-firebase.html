@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIBRAS · Sistema de Inversión</title>
+<!-- Firebase CDN -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAjmsv0urVnUuVHho8aQTjxDfOKOHbufV0",
+    authDomain: "fibras-app.firebaseapp.com",
+    projectId: "fibras-app",
+    storageBucket: "fibras-app.firebasestorage.app",
+    messagingSenderId: "10238263332",
+    appId: "1:10238263332:web:ebca0a51a445f040dd58b1"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // ── AUTH STATE ──
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'flex';
+      document.getElementById('user-email').textContent = user.email;
+      await loadUserData(user.uid);
+      fetchPrices();
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app-screen').style.display = 'none';
+    }
+  });
+
+  // ── LOGIN ──
+  window.doLogin = async () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    const err = document.getElementById('login-err');
+    err.textContent = '';
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch(e) {
+      err.textContent = 'Correo o contraseña incorrectos.';
+    }
+  };
+
+  // ── REGISTRO ──
+  window.doRegister = async () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    const err = document.getElementById('login-err');
+    err.textContent = '';
+    if (pass.length < 6) { err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await setDoc(doc(db, 'usuarios', cred.user.uid), { email, compras: [], ventas: [], dividendos: [], notas: [] });
+    } catch(e) {
+      if (e.code === 'auth/email-already-in-use') err.textContent = 'Ese correo ya tiene cuenta. Inicia sesión.';
+      else err.textContent = 'Error al crear cuenta: ' + e.message;
+    }
+  };
+
+  // ── LOGOUT ──
+  window.doLogout = async () => { await signOut(auth); };
+
+  // ── LOAD DATA ──
+  window._db = db;
+  window._auth = auth;
+  window._doc = doc;
+  window._setDoc = setDoc;
+  window._updateDoc = updateDoc;
+  window._arrayUnion = arrayUnion;
+  window._getDoc = getDoc;
+
+  async function loadUserData(uid) {
+    const ref = doc(db, 'usuarios', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      window.compras = data.compras || [];
+      window.ventas = data.ventas || [];
+      window.dividendos = data.dividendos || [];
+      renderHistorial();
+      renderPosiciones();
+    } else {
+      await setDoc(ref, { email: auth.currentUser.email, compras: [], ventas: [], dividendos: [], notas: [] });
+      window.compras = [];
+      window.ventas = [];
+      window.dividendos = [];
+    }
+  }
+
+  // ── SAVE TO FIRESTORE ──
+  window.saveCompra = async (compra) => {
+    const uid = auth.currentUser.uid;
+    await updateDoc(doc(db, 'usuarios', uid), { compras: arrayUnion(compra) });
+  };
+
+  window.saveVenta = async (venta) => {
+    const uid = auth.currentUser.uid;
+    await updateDoc(doc(db, 'usuarios', uid), { ventas: arrayUnion(venta) });
+  };
+
+  window.saveDividendo = async (div) => {
+    const uid = auth.currentUser.uid;
+    await updateDoc(doc(db, 'usuarios', uid), { dividendos: arrayUnion(div) });
+  };
+
+  // ── FETCH PRICES (Alpha Vantage fallback to static) ──
+  async function fetchPrices() {
+    const tickers = {
+      'FUNO11.MX': 'FUNO11', 'FMTY14.MX': 'FMTY14',
+      'DANHOS13.MX': 'DANHOS13', 'FSHOP13.MX': 'FSHOP13',
+      'FIBRAPL14.MX': 'FIBRAPL14', 'FNOVA17.MX': 'FNOVA17',
+      'NEXT25.MX': 'NEXT25', 'EDUCA18.MX': 'EDUCA18'
+    };
+
+    // Use Yahoo Finance unofficial endpoint via allorigins proxy
+    const prices = {};
+    const symbols = Object.keys(tickers).join(',');
+    try {
+      const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${symbols}&range=1d&interval=1d`)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const data = JSON.parse(json.contents);
+      if (data && data.spark && data.spark.result) {
+        data.spark.result.forEach(r => {
+          if (r && r.response && r.response[0] && r.response[0].meta) {
+            const ticker = tickers[r.symbol] || r.symbol;
+            prices[ticker] = r.response[0].meta.regularMarketPrice;
+          }
+        });
+      }
+    } catch(e) {
+      console.log('Price fetch failed, using cached data');
+    }
+
+    // Update UI with prices
+    window.livePrices = prices;
+    updatePriceDisplay(prices);
+    renderPosiciones();
+
+    // Show last update time
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+    const el = document.getElementById('last-update');
+    if (el) el.textContent = `Actualizado ${timeStr}`;
+  }
+
+  function updatePriceDisplay(prices) {
+    // Update screening cards if prices available
+    Object.entries(prices).forEach(([ticker, price]) => {
+      const el = document.getElementById('price-' + ticker);
+      if (el) el.textContent = '$' + price.toFixed(2);
+    });
+  }
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* LOGIN SCREEN */
+#login-screen {
+  display:flex;
+  min-height:100vh;
+  background:var(--bg);
+  align-items:center;
+  justify-content:center;
+}
+
+#app-screen { display:none; width:100%; }
+
+.login-card {
+  background:white;
+  border-radius:20px;
+  padding:40px;
+  width:380px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.1);
+  text-align:center;
+}
+
+.login-logo {
+  width:48px;height:48px;
+  background:#1a56db;
+  border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  color:white;font-weight:800;font-size:16px;
+  margin:0 auto 20px;
+}
+
+.login-title { font-size:20px;font-weight:700;margin-bottom:6px; }
+.login-sub { font-size:13px;color:#9aa3b0;margin-bottom:28px; }
+
+.login-input {
+  width:100%;
+  background:#f5f7fa;
+  border:1.5px solid #e8ecf2;
+  border-radius:10px;
+  padding:12px 16px;
+  font-size:14px;
+  font-family:'Inter',sans-serif;
+  margin-bottom:12px;
+  transition:border-color .15s;
+}
+
+.login-input:focus { outline:none;border-color:#1a56db;background:white; }
+.login-err { font-size:12px;color:#e02424;margin-bottom:10px;min-height:18px; }
+
+.login-btn-primary {
+  width:100%;padding:13px;
+  background:#1a56db;color:white;
+  border:none;border-radius:40px;
+  font-size:14px;font-weight:600;
+  cursor:pointer;font-family:'Inter',sans-serif;
+  margin-bottom:10px;transition:background .15s;
+}
+.login-btn-primary:hover { background:#1648c0; }
+
+.login-btn-secondary {
+  width:100%;padding:12px;
+  background:#f5f7fa;color:#5a6478;
+  border:1.5px solid #e8ecf2;border-radius:40px;
+  font-size:13px;font-weight:600;
+  cursor:pointer;font-family:'Inter',sans-serif;
+  transition:background .15s;
+}
+.login-btn-secondary:hover { background:#e8ecf2; }
+
+.login-divider {
+  display:flex;align-items:center;gap:12px;
+  margin:16px 0;color:#b0b8c9;font-size:12px;
+}
+.login-divider::before,.login-divider::after {
+  content:'';flex:1;height:1px;background:#e8ecf2;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f2f4f7;--white:#ffffff;--text:#0d1117;--text2:#5a6478;--text3:#b0b8c9;
+  --accent:#1a56db;--accent-light:#ebf0ff;
+  --green:#0e9f6e;--green-light:#e8f7f2;
+  --red:#e02424;--red-light:#fdf2f2;
+  --yellow:#c27803;--yellow-light:#fdf6e7;
+  --border:#e8ecf2;
+  --shadow:0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 16px rgba(0,0,0,0.09);
+  --r:16px;--rsm:10px;
+  --sans:'Inter',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+/* SIDEBAR */
+.sidebar{width:72px;min-height:100vh;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:20px 0;position:fixed;top:0;left:0;bottom:0;z-index:100;gap:4px;}
+.logo-mark{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:13px;margin-bottom:16px;}
+.nav-btn{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:18px;transition:all 0.15s;position:relative;border:none;background:transparent;}
+.nav-btn:hover{background:var(--bg);color:var(--text2);}
+.nav-btn.active{background:var(--accent-light);color:var(--accent);}
+.nav-tt{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:var(--text);color:white;font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.15s;}
+.nav-btn:hover .nav-tt{opacity:1;}
+.sb-spacer{flex:1;}
+
+/* MAIN */
+.main{margin-left:72px;flex:1;min-height:100vh;padding:28px;}
+.section{display:none;}
+.section.active{display:block;}
+
+/* PAGE HEADER */
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.ph-title{font-size:22px;font-weight:700;}
+.ph-sub{font-size:13px;color:var(--text3);margin-top:2px;}
+.ph-right{display:flex;gap:10px;}
+
+/* CARD */
+.card{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:40px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--sans);transition:all 0.15s;}
+.btn-dark{background:var(--text);color:white;}
+.btn-dark:hover{background:#1e2a3a;}
+.btn-outline{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.btn-outline:hover{background:var(--border);}
+.btn-accent{background:var(--accent);color:white;}
+.btn-accent:hover{background:#1648c0;}
+.btn-danger{background:var(--red);color:white;}
+.btn-success{background:var(--green);color:white;}
+
+/* PORTFOLIO HERO */
+.hero{background:var(--white);border-radius:var(--r);padding:28px 32px;box-shadow:var(--shadow);margin-bottom:16px;}
+.hero-val{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1;}
+.hero-cur{font-size:16px;font-weight:500;color:var(--text3);margin-left:6px;}
+.rend-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px;}
+.rend-chip{background:var(--bg);border-radius:var(--rsm);padding:14px 16px;}
+.rend-lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.rend-val{font-size:15px;font-weight:700;}
+.rend-pct{font-size:12px;font-weight:500;margin-top:2px;}
+
+/* CHART */
+.chart-wrap{height:150px;margin-top:24px;position:relative;}
+.chart-tabs{display:flex;gap:4px;margin-top:10px;}
+.ctab{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);font-family:var(--sans);}
+.ctab.active{background:var(--text);color:white;}
+
+/* DISPONIBLE */
+.disp-bar{background:var(--white);border-radius:var(--rsm);padding:16px 20px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.disp-lbl{font-size:12px;color:var(--text3);margin-bottom:3px;}
+.disp-val{font-size:22px;font-weight:700;}
+
+/* SECTION HEADING */
+.sec-h{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.sec-h-sub{font-size:12px;color:var(--text3);font-weight:400;}
+
+/* POSITION LIST */
+.pos-list{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+.pos-row{display:grid;grid-template-columns:44px 1fr auto auto auto;gap:16px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+.pos-row:last-child{border-bottom:none;}
+.pos-row:hover{background:var(--bg);}
+.pos-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;line-height:1.2;text-align:center;}
+.ico-div{background:#e8f7f2;color:#0e9f6e;}
+.ico-ind{background:#ebf0ff;color:#1a56db;}
+.ico-com{background:#f3f0ff;color:#6c40d9;}
+.pos-name{font-size:14px;font-weight:600;}
+.pos-sub{font-size:12px;color:var(--text3);margin-top:1px;}
+.pos-cbfis{font-size:13px;color:var(--text2);text-align:right;}
+.pos-val{font-size:14px;font-weight:600;text-align:right;}
+.pos-rend{font-size:12px;font-weight:600;text-align:right;}
+.empty-pos{padding:48px 24px;text-align:center;color:var(--text3);}
+.empty-ico{font-size:28px;margin-bottom:10px;}
+.empty-title{font-size:14px;font-weight:500;color:var(--text2);}
+.empty-sub{font-size:12px;margin-top:4px;}
+
+/* SUBTABS */
+.subtabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;}
+.stab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;font-family:var(--sans);}
+.stab:hover{color:var(--text2);}
+.stab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.stab-content{display:none;}
+.stab-content.active{display:block;}
+
+/* HIST ITEM */
+.hist-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+.hist-item:last-child{border-bottom:none;}
+.hist-dot{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.hd-buy{background:var(--green-light);}
+.hd-sell{background:var(--red-light);}
+.hd-div{background:var(--accent-light);}
+.hist-info{flex:1;}
+.hist-title{font-size:13px;font-weight:600;}
+.hist-date{font-size:11px;color:var(--text3);margin-top:2px;}
+.hist-amt{font-size:14px;font-weight:700;}
+
+/* FORM */
+.fg{margin-bottom:16px;}
+.fl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block;}
+input[type=number],input[type=text],input[type=date],select,textarea{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rsm);color:var(--text);padding:10px 14px;font-size:14px;font-family:var(--sans);transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:white;}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+/* SCREENING */
+.fibra-card{background:var(--white);border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:12px;display:grid;grid-template-columns:52px 1fr auto auto auto auto;gap:20px;align-items:center;transition:box-shadow .15s;}
+.fibra-card:hover{box-shadow:var(--shadow-md);}
+.fibra-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;text-align:center;line-height:1.2;}
+.fibra-name{font-size:15px;font-weight:700;}
+.fibra-sec{font-size:12px;color:var(--text3);margin-top:3px;}
+.fm{text-align:center;}
+.fm-val{font-size:15px;font-weight:700;}
+.fm-lbl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em;}
+.sig-badge{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;}
+.sig-buy{background:var(--green-light);color:var(--green);}
+.sig-watch{background:var(--yellow-light);color:var(--yellow);}
+.sig-skip{background:var(--red-light);color:var(--red);}
+.crit-row{display:flex;gap:4px;justify-content:center;margin-bottom:6px;}
+.cd{width:8px;height:8px;border-radius:50%;}
+.cd-ok{background:var(--green);}
+.cd-warn{background:var(--yellow);}
+.cd-fail{background:var(--red);}
+
+/* TAGS */
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
+.tag-ind{background:var(--accent-light);color:var(--accent);}
+.tag-com{background:#f3f0ff;color:#6c40d9;}
+.tag-div{background:var(--green-light);color:var(--green);}
+.fiscal-rf{background:var(--red-light);color:var(--red);padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;}
+.fiscal-rc{background:var(--green-light);color:var(--green);padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;}
+
+/* PROPUESTA */
+.prop-card{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);margin-bottom:16px;}
+.yield-hl{background:linear-gradient(135deg,var(--accent-light),#f0f4ff);border:1.5px solid rgba(26,86,219,.2);border-radius:var(--rsm);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.yield-big{font-size:32px;font-weight:800;color:var(--accent);letter-spacing:-1px;}
+.alloc-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
+.alloc-row:last-child{border-bottom:none;}
+.alloc-name{width:90px;font-size:13px;font-weight:700;}
+.alloc-bar{flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;}
+.alloc-fill{height:100%;border-radius:3px;transition:width .4s;}
+.alloc-pct{font-size:13px;font-weight:600;color:var(--text2);width:36px;text-align:right;}
+.alloc-yield{font-size:13px;font-weight:700;color:var(--green);width:48px;text-align:right;}
+input[type=range]{accent-color:var(--accent);}
+
+/* NOTA */
+.nota{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rsm);padding:14px;}
+.nota textarea{width:100%;background:transparent;border:none;color:var(--text2);font-size:13px;font-family:var(--sans);resize:none;min-height:80px;line-height:1.6;}
+.nota textarea:focus{outline:none;color:var(--text);}
+
+/* MARCO */
+.th-block{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);margin-bottom:14px;}
+.th-h{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.th-accent{color:var(--accent);}
+.rule-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2);line-height:1.6;align-items:flex-start;}
+.rule-item:last-child{border-bottom:none;}
+.rule-num{font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-light);padding:2px 7px;border-radius:5px;flex-shrink:0;margin-top:2px;}
+.sell-blk{background:var(--red-light);border-left:3px solid var(--red);border-radius:0 var(--rsm) var(--rsm) 0;padding:12px 16px;margin-bottom:8px;}
+.sell-blk-title{font-size:13px;font-weight:700;color:var(--red);margin-bottom:3px;}
+.sell-blk-desc{font-size:12px;color:var(--text2);line-height:1.5;}
+
+/* SIMULADOR */
+.sim-toggle{display:flex;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:24px;width:fit-content;}
+.sim-btn{padding:9px 22px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);font-family:var(--sans);transition:all .2s;}
+.sim-btn.active{background:var(--white);color:var(--accent);box-shadow:var(--shadow);}
+.sim-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.sim-out{background:var(--bg);border-radius:var(--rsm);padding:24px;}
+.sim-results{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+.sim-ri{text-align:center;}
+.sim-val{font-size:26px;font-weight:800;color:var(--accent);letter-spacing:-.5px;}
+.sim-lbl{font-size:11px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:.06em;font-weight:500;}
+.sim-bd{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding-top:16px;border-top:1px solid var(--border);}
+.sim-bdi{text-align:center;}
+.sim-bdv{font-size:15px;font-weight:700;}
+.sim-bdl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em;}
+.hitos{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;}
+.hito{background:var(--white);border-radius:var(--rsm);padding:14px;text-align:center;box-shadow:var(--shadow);}
+.hito-val{font-size:18px;font-weight:800;color:var(--accent);}
+.hito-lbl{font-size:11px;color:var(--text3);margin-top:4px;}
+
+/* MODAL */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(13,17,23,.5);z-index:500;align-items:center;justify-content:center;}
+.modal-ov.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--r);padding:28px;width:500px;max-width:92vw;box-shadow:var(--shadow-md);}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text3);margin-bottom:20px;line-height:1.5;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+
+/* UTILS */
+.pos{color:var(--green);}
+.neg{color:var(--red);}
+.neu{color:var(--text3);}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">FX</div>
+    <div class="login-title">FIBRAS · Sistema de Inversión</div>
+    <div class="login-sub">Inicia sesión para acceder a tu portafolio</div>
+    <input class="login-input" type="email" id="login-email" placeholder="correo@ejemplo.com">
+    <input class="login-input" type="password" id="login-pass" placeholder="Contraseña" onkeydown="if(event.key==='Enter') doLogin()">
+    <div class="login-err" id="login-err"></div>
+    <button class="login-btn-primary" onclick="doLogin()">Iniciar sesión</button>
+    <div class="login-divider">o</div>
+    <button class="login-btn-secondary" onclick="doRegister()">Crear cuenta nueva</button>
+    <div style="font-size:11px;color:#b0b8c9;margin-top:16px;">Tus datos se guardan de forma segura en Firebase · Google</div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo-mark">FX</div>
+  <button class="nav-btn active" onclick="showSection('dashboard',this)">📊<span class="nav-tt">Dashboard</span></button>
+  <button class="nav-btn" onclick="showSection('screening',this)">🔍<span class="nav-tt">Screening</span></button>
+  <button class="nav-btn" onclick="showSection('marco',this)">📖<span class="nav-tt">Marco Teórico</span></button>
+  <button class="nav-btn" onclick="showSection('simulador',this)">📈<span class="nav-tt">Simulador</span></button>
+  <div class="sb-spacer"></div>
+  <button class="nav-btn" onclick="openModal('modal-update')">⟳<span class="nav-tt">Actualizar datos</span></button>
+  <div style="width:44px;height:1px;background:var(--border);margin:8px 0;"></div>
+  <div style="font-size:9px;color:var(--text3);text-align:center;padding:0 4px;line-height:1.3;max-width:64px;overflow:hidden;word-break:break-all;" id="user-email"></div>
+  <button class="nav-btn" onclick="doLogout()" style="margin-top:4px;">🚪<span class="nav-tt">Cerrar sesión</span></button>
+</nav>
+
+<main class="main">
+
+<!-- ══ DASHBOARD ══ -->
+<div id="section-dashboard" class="section active">
+  <div class="ph">
+    <div><div class="ph-title">Mi portafolio</div><div class="ph-sub">Trading MX · <span id="last-update">Actualizando precios...</span></div></div>
+    <div class="ph-right">
+      <button class="btn btn-outline" onclick="openModal('modal-venta')">↑ Vender</button>
+      <button class="btn btn-dark" onclick="openModal('modal-aportacion')">+ Depositar</button>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div style="display:flex;align-items:flex-end;gap:8px;">
+      <div class="hero-val" id="dash-valor">$0<span style="font-size:20px;font-weight:400;">.00</span></div>
+      <div class="hero-cur">MXN</div>
+    </div>
+    <div style="margin-top:6px;font-size:13px;color:var(--text3);" id="dash-delta">Sin posiciones activas</div>
+
+    <div class="rend-grid">
+      <div class="rend-chip"><div class="rend-lbl">Rendimiento hoy</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
+      <div class="rend-chip"><div class="rend-lbl">Rendimiento del mes</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
+      <div class="rend-chip"><div class="rend-lbl">Rendimiento del año</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
+      <div class="rend-chip"><div class="rend-lbl">Rendimiento histórico</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
+    </div>
+
+    <div class="chart-wrap">
+      <svg width="100%" height="100%" viewBox="0 0 800 140" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1a56db" stop-opacity="0.12"/>
+            <stop offset="100%" stop-color="#1a56db" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <text x="400" y="76" text-anchor="middle" fill="#b0b8c9" font-size="13" font-family="Inter">El historial aparecerá aquí cuando registres tu primera aportación</text>
+      </svg>
+    </div>
+    <div class="chart-tabs">
+      <button class="ctab active">H</button>
+      <button class="ctab">1S</button>
+      <button class="ctab">1M</button>
+      <button class="ctab">3M</button>
+      <button class="ctab">1A</button>
+      <button class="ctab">Todo</button>
+    </div>
+  </div>
+
+  <!-- DISPONIBLE -->
+  <div class="disp-bar">
+    <div>
+      <div class="disp-lbl">Disponible para comprar</div>
+      <div class="disp-val">$0<span style="font-size:14px;color:var(--text3);font-weight:400;">.00 MXN</span></div>
+    </div>
+    <button class="btn btn-dark" onclick="openModal('modal-aportacion')">+ Comprar</button>
+  </div>
+
+  <!-- MI PORTAFOLIO -->
+  <div class="sec-h">Mi portafolio <span class="sec-h-sub" id="dash-yield-label">—</span></div>
+  <div class="pos-list" id="position-list">
+    <div class="empty-pos">
+      <div class="empty-ico">📂</div>
+      <div class="empty-title">Aquí verás tus instrumentos adquiridos</div>
+      <div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div>
+    </div>
+  </div>
+
+  <!-- SUBTABS -->
+  <div class="subtabs">
+    <button class="stab active" onclick="showStab('ordenes',this)">Órdenes</button>
+    <button class="stab" onclick="showStab('transacciones',this)">Transacciones</button>
+    <button class="stab" onclick="showStab('dividendos',this)">Dividendos</button>
+    <button class="stab" onclick="showStab('movimientos',this)">Movimientos</button>
+  </div>
+
+  <div id="stab-ordenes" class="stab-content active">
+    <div class="card"><div class="empty-pos"><div class="empty-ico">📋</div><div class="empty-title">Aún no has realizado órdenes</div></div></div>
+  </div>
+  <div id="stab-transacciones" class="stab-content">
+    <div class="card" id="hist-trans"><div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones registradas</div></div></div>
+  </div>
+  <div id="stab-dividendos" class="stab-content">
+    <div class="card" id="hist-divs"><div class="empty-pos"><div class="empty-ico">💰</div><div class="empty-title">Sin dividendos registrados</div><div class="empty-sub">Registra tus distribuciones cada trimestre</div></div></div>
+  </div>
+  <div id="stab-movimientos" class="stab-content">
+    <div class="card" id="hist-movs"><div class="empty-pos"><div class="empty-ico">📊</div><div class="empty-title">Sin movimientos</div></div></div>
+  </div>
+</div>
+
+<!-- ══ SCREENING ══ -->
+<div id="section-screening" class="section">
+  <div class="ph">
+    <div><div class="ph-title">Screening de FIBRAs</div><div class="ph-sub">16 FIBRAs · ordenadas por criterios cumplidos · datos 1T26</div></div>
+  </div>
+
+  <!-- Leyenda criterios -->
+  <div style="display:flex;gap:20px;align-items:center;margin-bottom:16px;padding:12px 16px;background:var(--white);border-radius:var(--rsm);box-shadow:var(--shadow);font-size:12px;color:var(--text2);">
+    <span style="font-weight:600;color:var(--text);">Criterios:</span>
+    <span><span style="font-weight:600;">Y</span> Yield 5–9%</span>
+    <span><span style="font-weight:600;">N</span> Desc. NAV</span>
+    <span><span style="font-weight:600;">O</span> Ocupación &gt;90%</span>
+    <span><span style="font-weight:600;">L</span> LTV &lt;40%</span>
+    <span><span style="font-weight:600;">A</span> AFFO cubre div.</span>
+    <span style="margin-left:auto;display:flex;gap:10px;">
+      <span><span style="color:var(--green);">●</span> Cumple</span>
+      <span><span style="color:var(--yellow);">●</span> Alerta</span>
+      <span><span style="color:var(--red);">●</span> No cumple</span>
+    </span>
+  </div>
+
+  <!-- SCORE 5/5 — COMPRAR -->
+  <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px;padding:4px 8px;background:var(--green-light);border-radius:5px;display:inline-block;">✓ Cumplen todos los criterios</div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-div">FUNO<br>11</div>
+    <div><div class="fibra-name">Fibra Uno</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val pos">8.44%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−41.6%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">95.7%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok" title="Y"></div><div class="cd cd-ok" title="N"></div><div class="cd cd-ok" title="O"></div><div class="cd cd-ok" title="L"></div><div class="cd cd-ok" title="A"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-com">DAN<br>HOS</div>
+    <div><div class="fibra-name">Danhos</div><div class="fibra-sec"><span class="tag tag-com">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span><span class="fiscal-rc" style="margin-left:3px;">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">6.42%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−32.8%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">91.9%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico" style="background:#fef3c7;color:#92400e;">EDU<br>CA</div>
+    <div><div class="fibra-name">Fibra Educa</div><div class="fibra-sec"><span class="tag" style="background:#fef3c7;color:#92400e;">Educativo</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">7.20%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−18.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">98.0%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-ind">NXT<br>25</div>
+    <div><div class="fibra-name">Fibra Next</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">6.80%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−22.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">97.7%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  </div>
+
+  <!-- SCORE 4/5 — OBSERVAR -->
+  <div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--yellow-light);border-radius:5px;display:inline-block;">⚠ Con observaciones (4/5)</div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-ind">FMTY<br>14</div>
+    <div><div class="fibra-name">Fibra Mty</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">7.75%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val neg">+9.6%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">96.6%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-warn" title="Premio +9.6%"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico" style="background:#fff7ed;color:#c2410c;">FSH<br>OP</div>
+    <div><div class="fibra-name">Fibra Shop</div><div class="fibra-sec"><span class="tag" style="background:#fff7ed;color:#c2410c;">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val pos">6.11%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−56.8%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">94.1%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn" title="LTV 39%"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-ind">FNO<br>VA</div>
+    <div><div class="fibra-name">Fibra Nova</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">5.90%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val neg">+53.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">95.0%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-fail" title="Premio +53%"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  </div>
+
+  <div class="fibra-card">
+    <div class="fibra-ico ico-div">FPL<br>US</div>
+    <div><div class="fibra-name">Fibra Plus</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">5.50%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−15.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">93.1%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn" title="AFFO ajustado"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  </div>
+
+  <!-- SCORE 3/5 o menos — NO CUMPLE -->
+  <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--red-light);border-radius:5px;display:inline-block;">✗ No cumplen criterios clave</div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico ico-ind">PL<br>14</div>
+    <div><div class="fibra-name">Fibra Prologis</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val neg">3.79%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val neu">−1.1%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">97.0%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#f3f0ff;color:#6c40d9;">TER<br>RA</div>
+    <div><div class="fibra-name">Terrafina</div><div class="fibra-sec"><span class="tag" style="background:#f3f0ff;color:#6c40d9;">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val neg">4.50%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−28.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val">94.5%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#e0f2fe;color:#0369a1;">FHI<br>PO</div>
+    <div><div class="fibra-name">FHipo</div><div class="fibra-sec"><span class="tag" style="background:#e0f2fe;color:#0369a1;">Hipotecario</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val neg">4.10%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−20.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neu">N/A</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#f0fdf4;color:#166534;">STO<br>RE</div>
+    <div><div class="fibra-name">Fibra Storage</div><div class="fibra-sec"><span class="tag" style="background:#f0fdf4;color:#166534;">Almacenaje</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val pos">9.50%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−30.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neg">83.5%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-warn" title="Yield >9%"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Ocup. 83.5%"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Ocupación baja</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#fdf4ff;color:#7e22ce;">FMX<br>23</div>
+    <div><div class="fibra-name">Fibra MX</div><div class="fibra-sec"><span class="tag" style="background:#fdf4ff;color:#7e22ce;">Infraestructura</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
+    <div class="fm"><div class="fm-val neg">3.50%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Datos insuf.</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#fff1f2;color:#be123c;">FCFE<br>18</div>
+    <div><div class="fibra-name">Fibra CFE</div><div class="fibra-sec"><span class="tag" style="background:#fff1f2;color:#be123c;">Energía</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Excluida</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FINN<br>13</div>
+    <div><div class="fibra-name">Fibra Inn</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val pos">7.27%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−59.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neg">58.0%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Hotelero excluido"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+  </div>
+
+  <div class="fibra-card" style="opacity:.65;">
+    <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FIH<br>O</div>
+    <div><div class="fibra-name">Fibra Hotel</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
+    <div class="fm"><div class="fm-val neg">4.80%</div><div class="fm-lbl">Yield</div></div>
+    <div class="fm"><div class="fm-val pos">−45.0%</div><div class="fm-lbl">vs NAV</div></div>
+    <div class="fm"><div class="fm-val neg">60.1%</div><div class="fm-lbl">Ocupación</div></div>
+    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Hotelero excluido"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- PROPUESTA -->
+  <div class="prop-card">
+    <div class="sec-h" style="margin-bottom:16px;">Portafolio sugerido</div>
+    <div class="yield-hl">
+      <div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">Yield Distribuible Ponderado</div>
+        <div class="yield-big" id="scr-yield-big">7.37%</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px;">Por cada $10,000 invertidos: <strong style="color:var(--green);">~$61/mes</strong></div>
+      </div>
+      <button class="btn btn-accent" onclick="confirmarPortafolio()">Confirmar →</button>
+    </div>
+    <div class="alloc-row"><div class="alloc-name">FUNO11</div><input type="range" min="10" max="40" value="35" id="sl-funo" oninput="updateAlloc()"><div class="alloc-pct" id="val-funo">35%</div><div class="alloc-yield">8.44%</div></div>
+    <div class="alloc-row"><div class="alloc-name">FMTY14</div><input type="range" min="10" max="40" value="25" id="sl-fmty" oninput="updateAlloc()"><div class="alloc-pct" id="val-fmty">25%</div><div class="alloc-yield">7.75%</div></div>
+    <div class="alloc-row"><div class="alloc-name">DANHOS13</div><input type="range" min="10" max="40" value="25" id="sl-danhos" oninput="updateAlloc()"><div class="alloc-pct" id="val-danhos">25%</div><div class="alloc-yield">6.42%</div></div>
+    <div class="alloc-row"><div class="alloc-name">FSHOP13</div><input type="range" min="10" max="40" value="15" id="sl-fshop" oninput="updateAlloc()"><div class="alloc-pct" id="val-fshop">15%</div><div class="alloc-yield">6.11%</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:var(--rsm);">
+      <span style="font-size:13px;color:var(--text3);">Suma: <strong id="scr-suma" style="color:var(--green);">100%</strong></span>
+      <span style="font-size:13px;color:var(--text3);">Yield ponderado: <strong id="scr-yield" style="color:var(--accent);">7.37%</strong></span>
+    </div>
+  </div>
+
+  <div class="prop-card">
+    <div class="sec-h" style="margin-bottom:12px;">Bitácora</div>
+    <div class="nota"><textarea placeholder="Escribe el razonamiento de tus decisiones de este mes..."></textarea></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;"><button class="btn btn-outline">Guardar nota</button></div>
+  </div>
+</div>
+
+<!-- ══ MARCO TEÓRICO ══ -->
+<div id="section-marco" class="section">
+  <div class="ph"><div><div class="ph-title">Marco Teórico</div><div class="ph-sub">Fundamentos, metodología y reglas del sistema</div></div></div>
+
+  <div class="th-block">
+    <div class="th-h">◈ <span class="th-accent">Filosofía base</span></div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.7;">Basado en Brinson, Hood & Beebower (1986): el <strong style="color:var(--accent);">91.5% del rendimiento</strong> de un portafolio proviene de la distribución de activos, no de la selección individual. Cuánto tienes en cada FIBRA importa más que cuál tienes.</p>
+    <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-top:10px;">Objetivo: portafolio con <strong style="color:var(--green);">yield entre 5% y 9%</strong> más crecimiento por apreciación. El dividendo es flujo real y comprobable — el NAV es margen de seguridad, no garantía de precio futuro.</p>
+  </div>
+
+  <div class="th-block">
+    <div class="th-h">✓ <span class="th-accent">Criterios de entrada</span> — todos deben cumplirse</div>
+    <div class="rule-item"><span class="rule-num">01</span><div><strong>Yield entre 5% y 9%</strong> — por debajo no compensa vs renta fija; por encima puede señalar distress financiero.</div></div>
+    <div class="rule-item"><span class="rule-num">02</span><div><strong>Cotiza con descuento vs NAV</strong> — precio menor al valor de activos netos. Margen de seguridad ante caídas.</div></div>
+    <div class="rule-item"><span class="rule-num">03</span><div><strong>Ocupación mayor al 90%</strong> — el flujo operativo que sustenta el dividendo es real y estable. Hoteleras excluidas.</div></div>
+    <div class="rule-item"><span class="rule-num">04</span><div><strong>LTV menor al 40%</strong> — apalancamiento conservador. En ciclos de tasas altas, la deuda excesiva comprime el AFFO.</div></div>
+    <div class="rule-item"><span class="rule-num">05</span><div><strong>AFFO cubre 100% del dividendo</strong> — el payout ratio no debe exceder el flujo de caja ajustado.</div></div>
+  </div>
+
+  <div class="th-block">
+    <div class="th-h">⚠ <span style="color:var(--red);">Señales de venta</span> — cualquiera activa salida</div>
+    <div class="sell-blk"><div class="sell-blk-title">Premio sobre NAV mayor a +10%</div><div class="sell-blk-desc">Margen de seguridad desapareció. El mercado paga más de lo que valen los activos. (Green Street Advisors)</div></div>
+    <div class="sell-blk"><div class="sell-blk-title">Yield cae bajo 5% o recorte de dividendo mayor a 10%</div><div class="sell-blk-desc">Un recorte en REITs históricamente precede caídas de precio de 15–30%.</div></div>
+    <div class="sell-blk"><div class="sell-blk-title">Ocupación cae bajo 88% por 2 trimestres consecutivos</div><div class="sell-blk-desc">Deterioro estructural del portafolio de propiedades, no estacionalidad.</div></div>
+    <div class="sell-blk" style="margin-bottom:0;"><div class="sell-blk-title">LTV supera 40%</div><div class="sell-blk-desc">Apalancamiento excesivo comprime el AFFO y eleva el riesgo de impago.</div></div>
+  </div>
+
+  <div class="th-block">
+    <div class="th-h">◧ <span class="th-accent">Distribución del portafolio</span></div>
+    <div class="rule-item"><span class="rule-num">1°</span><div><strong>Yield actual</strong> — mayor yield dentro del rango 5–9% recibe mayor peso. Es el flujo real y garantizable.</div></div>
+    <div class="rule-item"><span class="rule-num">2°</span><div><strong>Descuento al NAV</strong> — entre FIBRAs con yield similar, mayor peso a la que cotiza con mayor descuento.</div></div>
+    <div class="rule-item"><span class="rule-num">Máx</span><div>Ninguna FIBRA puede superar el <strong>40%</strong> del portafolio ni estar por debajo del <strong>10%</strong>.</div></div>
+    <div class="rule-item" style="border:none;"><span class="rule-num">Meta</span><div>Industrial 50% · Comercial 30% · Diversificado 20% · Oficinas 0%.</div></div>
+  </div>
+</div>
+
+<!-- ══ SIMULADOR ══ -->
+<div id="section-simulador" class="section">
+  <div class="ph"><div><div class="ph-title">Simulador de Crecimiento</div><div class="ph-sub">Proyecta tu portafolio en el tiempo</div></div></div>
+
+  <div class="card">
+    <div class="sim-toggle">
+      <button class="sim-btn active" id="btn-reinv" onclick="setModo('reinv')">↺ Reinvertir dividendos</button>
+      <button class="sim-btn" id="btn-ret" onclick="setModo('ret')">↓ Retirar dividendos</button>
+    </div>
+
+    <div id="modo-desc" style="padding:10px 14px;background:var(--accent-light);border-left:3px solid var(--accent);border-radius:0 var(--rsm) var(--rsm) 0;font-size:12px;color:var(--text2);margin-bottom:24px;line-height:1.6;">
+      <strong>Reinversión total:</strong> Cada dividendo se suma al capital y genera más dividendos. Máximo interés compuesto — ideal para fase de acumulación.
+    </div>
+
+    <div class="sim-grid">
+      <div><label class="fl">Capital inicial (MXN)</label><input type="number" id="sim-ini" value="0" min="0" oninput="calcSim()" placeholder="0"></div>
+      <div><label class="fl">Aportación mensual</label><input type="number" id="sim-men" value="1000" min="0" oninput="calcSim()"></div>
+      <div><label class="fl">Años de inversión</label><input type="number" id="sim-anos" value="10" min="1" max="40" oninput="calcSim()"></div>
+      <div><label class="fl">Yield anual (%)</label><input type="number" id="sim-yield" value="7.37" min="1" max="20" step="0.1" oninput="calcSim()"></div>
+    </div>
+
+    <div class="sim-out">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:16px;">Proyección al final del período</div>
+      <div class="sim-results">
+        <div class="sim-ri"><div class="sim-val" id="sv-cap">$0</div><div class="sim-lbl">Capital final</div></div>
+        <div class="sim-ri"><div class="sim-val" id="sv-da">$0</div><div class="sim-lbl" id="lbl-da">Dividendo anual</div></div>
+        <div class="sim-ri"><div class="sim-val" id="sv-dm">$0</div><div class="sim-lbl" id="lbl-dm">Renta mensual</div></div>
+        <div class="sim-ri"><div class="sim-val" style="color:var(--green);" id="sv-gan">$0</div><div class="sim-lbl">Ganancia total</div></div>
+      </div>
+      <div class="sim-bd">
+        <div class="sim-bdi"><div class="sim-bdv" id="sv-ini">$0</div><div class="sim-bdl">Capital inicial</div></div>
+        <div class="sim-bdi"><div class="sim-bdv" id="sv-tap">$0</div><div class="sim-bdl">Total aportado</div></div>
+        <div class="sim-bdi"><div class="sim-bdv" style="color:var(--green);" id="sv-dac">$0</div><div class="sim-bdl">Dividendos acumulados</div></div>
+      </div>
+    </div>
+
+    <div style="font-size:13px;font-weight:600;margin:20px 0 12px;">¿En cuántos años llegas a esta renta mensual?</div>
+    <div class="hitos" id="sim-hitos"></div>
+    <div style="margin-top:16px;font-size:11px;color:var(--text3);line-height:1.6;">* Asume yield constante y aportaciones al inicio de cada mes. No considera inflación ni impuestos. Solo informativo.</div>
+  </div>
+</div>
+
+</main>
+</div><!-- /app-screen -->
+
+<!-- MODAL COMPRA -->
+<div class="modal-ov" id="modal-aportacion">
+  <div class="modal">
+    <div class="modal-title">Nueva compra</div>
+    <div class="modal-sub">Registra la FIBRA que compraste este mes.</div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Fecha</label><input type="date" id="ap-fecha"></div>
+      <div class="fg"><label class="fl">Monto total (MXN)</label><input type="number" id="ap-monto" placeholder="1000"></div>
+    </div>
+    <div class="fg"><label class="fl">FIBRA</label>
+      <select id="ap-fibra">
+        <optgroup label="✓ Cumplen criterios">
+          <option>FUNO11 — Fibra Uno (Diversificado)</option>
+          <option>DANHOS13 — Danhos (Comercial)</option>
+          <option>EDUCA18 — Fibra Educa (Educativo)</option>
+          <option>NEXT25 — Fibra Next (Industrial)</option>
+        </optgroup>
+        <optgroup label="⚠ Con observaciones">
+          <option>FMTY14 — Fibra Mty (Industrial)</option>
+          <option>FSHOP13 — Fibra Shop (Comercial)</option>
+          <option>FNOVA17 — Fibra Nova (Industrial)</option>
+          <option>FPLUS16 — Fibra Plus (Diversificado)</option>
+        </optgroup>
+        <optgroup label="✗ No cumplen criterios">
+          <option>FIBRAPL14 — Fibra Prologis (Industrial)</option>
+          <option>TERRA13 — Terrafina (Industrial)</option>
+          <option>FHIPO14 — FHipo (Hipotecario)</option>
+          <option>STORAGE18 — Fibra Storage (Almacenaje)</option>
+          <option>FMX23 — Fibra MX (Infraestructura)</option>
+          <option>FCFE18 — Fibra CFE (Energía)</option>
+          <option>FINN13 — Fibra Inn (Hotelero)</option>
+          <option>FIHO12 — Fibra Hotel (Hotelero)</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">Precio de compra ($)</label><input type="number" id="ap-precio" placeholder="29.21"></div>
+      <div class="fg"><label class="fl">CBFIs comprados</label><input type="number" id="ap-cbfis" placeholder="34"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-aportacion')">Cancelar</button>
+      <button class="btn btn-dark" onclick="registrarCompra()">✓ Confirmar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VENTA -->
+<div class="modal-ov" id="modal-venta">
+  <div class="modal">
+    <div class="modal-title">Registrar venta</div>
+    <div class="modal-sub">Registra la venta de CBFIs de tu portafolio.</div>
+    <div class="fg"><label class="fl">FIBRA</label>
+      <select id="vt-fibra">
+        <option>FUNO11</option><option>DANHOS13</option><option>EDUCA18</option><option>NEXT25</option>
+        <option>FMTY14</option><option>FSHOP13</option><option>FNOVA17</option><option>FPLUS16</option>
+        <option>FIBRAPL14</option><option>TERRA13</option><option>FHIPO14</option><option>STORAGE18</option>
+        <option>FMX23</option><option>FCFE18</option><option>FINN13</option><option>FIHO12</option>
+      </select>
+    </div>
+    <div class="fg3">
+      <div class="fg"><label class="fl">CBFIs</label><input type="number" id="vt-cbfis" placeholder="100"></div>
+      <div class="fg"><label class="fl">Precio venta ($)</label><input type="number" id="vt-precio" placeholder="29.50"></div>
+      <div class="fg"><label class="fl">Fecha</label><input type="date" id="vt-fecha"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-venta')">Cancelar</button>
+      <button class="btn btn-danger" onclick="registrarVenta()">↑ Confirmar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACTUALIZAR -->
+<div class="modal-ov" id="modal-update">
+  <div class="modal">
+    <div class="modal-title">Actualizar datos</div>
+    <div class="modal-sub">Copia este prompt, pégalo en Claude, y devuelve el JSON aquí para actualizar todas las métricas.</div>
+    <div style="background:var(--bg);border-radius:var(--rsm);padding:14px;font-size:11px;color:var(--text2);line-height:1.8;margin-bottom:16px;font-family:monospace;user-select:all;cursor:text;">
+      Busca en ingresopasivo.mx/fibras y Yahoo Finance: precio, NAV/CBFI, descuento NAV (%), yield (%), ocupación (%), LTV (%) para FUNO11, FMTY14, DANHOS13, FSHOP13. Devuelve SOLO JSON: {"fibras":[{"ticker":"FUNO11","precio":0,"nav":0,"descuento":0,"yield":0,"ocupacion":0,"ltv":0}]}
+    </div>
+    <div class="fg"><label class="fl">Respuesta de Claude (JSON)</label>
+      <textarea id="update-input" style="min-height:90px;resize:vertical;font-family:monospace;font-size:12px;" placeholder='{"fibras":[...]}'></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-update')">Cancelar</button>
+      <button class="btn btn-accent" onclick="applyUpdate()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// NAV
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// SUBTABS
+function showStab(id, btn) {
+  document.querySelectorAll('.stab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.stab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('stab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// MODALS
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-ov').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+// CHART TABS
+document.querySelectorAll('.ctab').forEach(t => t.addEventListener('click', function(){ document.querySelectorAll('.ctab').forEach(x=>x.classList.remove('active')); this.classList.add('active'); }));
+
+// DATA (populated from Firebase on login)
+window.compras = window.compras || [];
+window.ventas = window.ventas || [];
+window.dividendos = window.dividendos || [];
+window.livePrices = window.livePrices || {};
+
+// STATIC PRICE FALLBACK (last known prices 1T26)
+const staticPrices = {
+  FUNO11: 29.21, FMTY14: 13.78, DANHOS13: 28.03,
+  FSHOP13: 11.50, FIBRAPL14: 76.74, FNOVA17: 41.48,
+  NEXT25: 28.50, EDUCA18: 35.20, TERRA13: 42.10,
+  FHIPO14: 18.30, STORAGE18: 25.40, FMX23: 12.20,
+  FCFE18: 30.00, FINN13: 4.95, FIHO12: 8.60, FPLUS16: 1.80
+};
+
+function getPrice(ticker) {
+  return window.livePrices[ticker] || staticPrices[ticker] || 0;
+}
+
+function renderPosiciones() {
+  // Group compras by fibra
+  const pos = {};
+  (window.compras || []).forEach(c => {
+    const t = c.fibra;
+    if (!pos[t]) pos[t] = { cbfis: 0, costo: 0, monto: 0 };
+    pos[t].cbfis += (c.cbfis || 0);
+    pos[t].monto += (c.monto || 0);
+    pos[t].costo += (c.cbfis || 0) * (c.precio || 0);
+  });
+  // Subtract ventas
+  (window.ventas || []).forEach(v => {
+    if (pos[v.fibra]) pos[v.fibra].cbfis -= (v.cbfis || 0);
+  });
+
+  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
+  const totalInv = Object.values(pos).reduce((a,p) => a + p.monto, 0);
+
+  // Update hero value
+  let totalActual = 0;
+  Object.entries(pos).forEach(([t, p]) => {
+    if (p.cbfis > 0) totalActual += p.cbfis * getPrice(t);
+  });
+  document.getElementById('dash-valor').innerHTML = fmt(totalActual) + '<span style="font-size:16px;font-weight:400;"> MXN</span>';
+
+  const plNeto = totalActual - totalInv;
+  const plPct = totalInv > 0 ? ((plNeto/totalInv)*100).toFixed(2) : 0;
+  const deltaEl = document.getElementById('dash-delta');
+  if (totalInv > 0) {
+    deltaEl.innerHTML = `<span style="color:${plNeto>=0?'var(--green)':'var(--red)'};">${plNeto>=0?'+':''}${fmt(plNeto)} (${plPct}%) histórico</span>`;
+  } else {
+    deltaEl.textContent = 'Sin posiciones activas';
+  }
+
+  // Render position list
+  const list = document.getElementById('position-list');
+  const activPos = Object.entries(pos).filter(([t,p]) => p.cbfis > 0);
+  if (activPos.length === 0) {
+    list.innerHTML = '<div class="empty-pos"><div class="empty-ico">📂</div><div class="empty-title">Aquí verás tus instrumentos adquiridos</div><div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div></div>';
+    document.getElementById('dash-yield-label').textContent = '—';
+    return;
+  }
+
+  const sectorColors = {
+    FUNO11:'ico-div', DANHOS13:'ico-com', FMTY14:'ico-ind', FSHOP13:'',
+    FIBRAPL14:'ico-ind', FNOVA17:'ico-ind', NEXT25:'ico-ind', EDUCA18:''
+  };
+
+  let html = '';
+  activPos.forEach(([ticker, p]) => {
+    const precio = getPrice(ticker);
+    const valorActual = p.cbfis * precio;
+    const precioPromedio = p.cbfis > 0 ? p.costo / p.cbfis : 0;
+    const pl = valorActual - (precioPromedio * p.cbfis);
+    const plp = precioPromedio > 0 ? ((precio - precioPromedio)/precioPromedio*100).toFixed(2) : 0;
+    const cls = sectorColors[ticker] || 'ico-div';
+    html += `<div class="pos-row">
+      <div class="pos-ico ${cls}" style="${!cls?'background:#f5f7fa;color:#5a6478;':''}">${ticker.replace(/\d+/g,'')}<br><span style="font-size:8px;">${ticker.match(/\d+/)?.[0]||''}</span></div>
+      <div><div class="pos-name">${ticker}</div><div class="pos-sub">${p.cbfis.toFixed(0)} CBFIs · Precio entrada: ${fmt(precioPromedio)}</div></div>
+      <div class="pos-cbfis" style="font-size:11px;color:var(--text3);">Precio actual<br><strong style="color:var(--text);font-size:13px;" id="price-${ticker}">${fmt(precio)}</strong></div>
+      <div class="pos-val">${fmt(valorActual)}</div>
+      <div class="pos-rend" style="color:${pl>=0?'var(--green)':'var(--red)'};">${pl>=0?'+':''}${fmt(pl)}<br>${plp}%</div>
+    </div>`;
+  });
+  list.innerHTML = html;
+
+  // Update yield label
+  const yieldPond = 7.37; // TODO: calculate from portfolio
+  document.getElementById('dash-yield-label').textContent = `Yield ponderado ~${yieldPond}% · ${activPos.length} posiciones`;
+}
+
+function registrarCompra() {
+  const fecha = document.getElementById('ap-fecha').value;
+  const monto = parseFloat(document.getElementById('ap-monto').value);
+  const fibra = document.getElementById('ap-fibra').value.split('—')[0].trim();
+  const precio = parseFloat(document.getElementById('ap-precio').value) || 0;
+  const cbfis = parseFloat(document.getElementById('ap-cbfis').value) || 0;
+  if (!fecha || !monto) return alert('Ingresa fecha y monto.');
+  const compra = { fecha, monto, fibra, precio, cbfis, ts: Date.now() };
+  window.compras.push(compra);
+  if (window.saveCompra) window.saveCompra(compra);
+  renderHistorial();
+  renderPosiciones();
+  closeModal('modal-aportacion');
+}
+
+function registrarVenta() {
+  const fibra = document.getElementById('vt-fibra').value;
+  const cbfis = parseFloat(document.getElementById('vt-cbfis').value) || 0;
+  const precio = parseFloat(document.getElementById('vt-precio').value) || 0;
+  const fecha = document.getElementById('vt-fecha').value;
+  if (!fecha || !cbfis || !precio) return alert('Completa todos los campos.');
+  const venta = { fecha, fibra, cbfis, precio, total: cbfis * precio, ts: Date.now() };
+  window.ventas.push(venta);
+  if (window.saveVenta) window.saveVenta(venta);
+  renderHistorial();
+  renderPosiciones();
+  closeModal('modal-venta');
+}
+
+function renderHistorial() {
+  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
+  const c = window.compras || [], v = window.ventas || [];
+  const totalInv = c.reduce((a,b) => a+b.monto, 0);
+  let html = '<div style="padding:0 20px;">';
+  [...c].reverse().forEach(x => {
+    html += `<div class="hist-item"><div class="hist-dot hd-buy">🛒</div><div class="hist-info"><div class="hist-title">Compra · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt pos">+${fmt(x.monto)}</div></div>`;
+  });
+  [...v].reverse().forEach(x => {
+    html += `<div class="hist-item"><div class="hist-dot hd-sell">💸</div><div class="hist-info"><div class="hist-title">Venta · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt neg">−${fmt(x.total)}</div></div>`;
+  });
+  html += '</div>';
+  if (c.length === 0 && v.length === 0) html = '<div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones</div></div>';
+  const el = document.getElementById('hist-trans');
+  if (el) el.innerHTML = html;
+  const mov = document.getElementById('hist-movs');
+  if (mov) mov.innerHTML = `<div style="padding:16px 20px;">
+    <div class="hist-item"><div class="hist-dot hd-buy">💼</div><div class="hist-info"><div class="hist-title">Total invertido</div><div class="hist-date">${c.length} aportaciones</div></div><div class="hist-amt pos">${fmt(totalInv)}</div></div>
+    <div class="hist-item"><div class="hist-dot hd-sell">📤</div><div class="hist-info"><div class="hist-title">Total retirado</div></div><div class="hist-amt neg">${fmt(v.reduce((a,b)=>a+b.total,0))}</div></div>
+  </div>`;
+}
+
+// ALLOC
+const ylds = {funo:8.44,fmty:7.75,danhos:6.42,fshop:6.11};
+
+function updateAlloc() {
+  const v = {funo:+document.getElementById('sl-funo').value,fmty:+document.getElementById('sl-fmty').value,danhos:+document.getElementById('sl-danhos').value,fshop:+document.getElementById('sl-fshop').value};
+  Object.keys(v).forEach(k => document.getElementById('val-'+k).textContent = v[k]+'%');
+  const suma = Object.values(v).reduce((a,b)=>a+b,0);
+  const se = document.getElementById('scr-suma');
+  se.textContent = suma+'%'; se.style.color = suma===100 ? 'var(--green)' : 'var(--red)';
+  const yp = Object.keys(v).reduce((a,k)=>a+(v[k]/100)*ylds[k],0);
+  document.getElementById('scr-yield').textContent = yp.toFixed(2)+'%';
+  document.getElementById('scr-yield-big').textContent = yp.toFixed(2)+'%';
+}
+
+function confirmarPortafolio() {
+  alert('✓ Portafolio confirmado. Ve al Dashboard para registrar tu primera compra.');
+  showSection('dashboard', document.querySelector('.nav-btn'));
+  document.querySelector('.nav-btn').classList.add('active');
+}
+
+// SIMULADOR
+let modo = 'reinv';
+
+function setModo(m) {
+  modo = m;
+  document.getElementById('btn-reinv').classList.toggle('active', m==='reinv');
+  document.getElementById('btn-ret').classList.toggle('active', m==='ret');
+  const desc = document.getElementById('modo-desc');
+  if (m==='reinv') {
+    desc.style.background='var(--accent-light)'; desc.style.borderColor='var(--accent)';
+    desc.innerHTML='<strong>Reinversión total:</strong> Cada dividendo se suma al capital y genera más dividendos. Máximo interés compuesto — ideal para fase de acumulación.';
+    document.getElementById('lbl-da').textContent='Dividendo anual (año final)';
+    document.getElementById('lbl-dm').textContent='Renta mensual (año final)';
+  } else {
+    desc.style.background='var(--yellow-light)'; desc.style.borderColor='var(--yellow)';
+    desc.innerHTML='<strong>Retiro de dividendos:</strong> Cada mes retiras el dividendo como renta pasiva. El capital crece solo por aportaciones. Ideal para vivir de tus inversiones.';
+    document.getElementById('lbl-da').textContent='Renta anual (estable)';
+    document.getElementById('lbl-dm').textContent='Renta mensual (estable)';
+  }
+  calcSim();
+}
+
+function calcSim() {
+  const ini = parseFloat(document.getElementById('sim-ini').value)||0;
+  const men = parseFloat(document.getElementById('sim-men').value)||0;
+  const anos = parseInt(document.getElementById('sim-anos').value)||0;
+  const ya = parseFloat(document.getElementById('sim-yield').value)/100||0;
+  const ms = anos*12, tM = ya/12;
+  const fmt = n => '$'+Math.round(n).toLocaleString('es-MX');
+  const tap = men*ms;
+  let cap, dAcum;
+
+  if (modo==='reinv') {
+    cap = ini*Math.pow(1+tM,ms);
+    cap += tM>0 ? men*(Math.pow(1+tM,ms)-1)/tM : tap;
+    dAcum = cap-ini-tap;
+  } else {
+    cap = ini+tap;
+    let c=ini; dAcum=0;
+    for(let m=1;m<=ms;m++){c+=men; dAcum+=c*tM;}
+  }
+
+  const da=cap*ya, dm=da/12;
+  const gan = modo==='reinv' ? dAcum : dAcum+(cap-ini-tap);
+
+  document.getElementById('sv-cap').textContent=fmt(cap);
+  document.getElementById('sv-da').textContent=fmt(da);
+  document.getElementById('sv-dm').textContent=fmt(dm);
+  document.getElementById('sv-gan').textContent=fmt(gan);
+  document.getElementById('sv-ini').textContent=fmt(ini);
+  document.getElementById('sv-tap').textContent=fmt(tap);
+  document.getElementById('sv-dac').textContent=fmt(dAcum);
+
+  const hitos=[10000,30000,60000,100000];
+  let h='';
+  hitos.forEach(meta=>{
+    const cn=tM>0?meta/tM:Infinity;
+    let mh=Infinity;
+    if(tM>0){let c=ini; for(let m=0;m<=600;m++){c=c*(1+tM)+men; if(c>=cn){mh=m+1;break;}}}
+    const ok=mh<=600;
+    h+=`<div class="hito"><div class="hito-val">${ok?Math.ceil(mh/12)+' años':'+50a'}</div><div class="hito-lbl">${fmt(meta)}/mes</div></div>`;
+  });
+  document.getElementById('sim-hitos').innerHTML=h;
+}
+
+function applyUpdate() {
+  const raw=document.getElementById('update-input').value.trim();
+  if(!raw) return alert('Pega la respuesta de Claude primero.');
+  try { JSON.parse(raw); alert('✓ Datos actualizados correctamente.'); closeModal('modal-update'); }
+  catch(e){ alert('Error en el formato JSON.'); }
+}
+
+// INIT
+updateAlloc();
+setModo('reinv');
+</script>
+</body>
+</html>
