@@ -7,7 +7,7 @@
 <!-- Firebase CDN -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -21,6 +21,8 @@
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  // Sesión permanente — no pide login cada vez que abres la app
+  await setPersistence(auth, browserLocalPersistence);
   const db = getFirestore(app);
 
   // ── AUTH STATE ──
@@ -88,6 +90,7 @@
       window.dividendos = data.dividendos || [];
       renderHistorial();
       renderPosiciones();
+      renderDividendos();
     } else {
       await setDoc(ref, { email: auth.currentUser.email, compras: [], ventas: [], dividendos: [], notas: [] });
       window.compras = [];
@@ -401,8 +404,20 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
 
 /* SCREENING */
-.fibra-card{background:var(--white);border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:12px;display:grid;grid-template-columns:52px 1fr auto auto auto auto;gap:20px;align-items:center;transition:box-shadow .15s;}
+.fibra-card{background:var(--white);border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:12px;transition:box-shadow .15s;cursor:pointer;}
 .fibra-card:hover{box-shadow:var(--shadow-md);}
+.fibra-card-row{display:grid;grid-template-columns:52px 1fr auto auto auto auto;gap:20px;align-items:center;}
+.fibra-chart-panel{display:none;border-top:1px solid var(--border);margin-top:16px;padding-top:16px;}
+.fibra-chart-panel.open{display:block;}
+.exdiv-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;background:var(--accent-light);color:var(--accent);margin-top:4px;}
+.exdiv-soon{background:#fff7ed;color:#c2410c;}
+.period-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;}
+.ptab{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:var(--bg);color:var(--text3);font-family:var(--sans);}
+.ptab.active{background:var(--text);color:white;}
+.perf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.perf-item{background:var(--bg);border-radius:8px;padding:10px;text-align:center;}
+.perf-val{font-size:14px;font-weight:700;}
+.perf-lbl{font-size:10px;color:var(--text3);margin-top:2px;}
 .fibra-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;text-align:center;line-height:1.2;}
 .fibra-name{font-size:15px;font-weight:700;}
 .fibra-sec{font-size:12px;color:var(--text3);margin-top:3px;}
@@ -523,6 +538,7 @@ input[type=range]{accent-color:var(--accent);}
   <div style="width:44px;height:1px;background:var(--border);margin:8px 0;"></div>
   <div style="font-size:9px;color:var(--text3);text-align:center;padding:0 4px;line-height:1.3;max-width:64px;overflow:hidden;word-break:break-all;" id="user-email"></div>
   <button class="nav-btn" onclick="doLogout()" style="margin-top:4px;">🚪<span class="nav-tt">Cerrar sesión</span></button>
+  <button class="nav-btn" onclick="setupBiometrics()" style="margin-top:4px;">🔐<span class="nav-tt">Activar Face ID</span></button>
 </nav>
 
 <main class="main">
@@ -607,7 +623,31 @@ input[type=range]{accent-color:var(--accent);}
     <div class="card" id="hist-trans"><div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones registradas</div></div></div>
   </div>
   <div id="stab-dividendos" class="stab-content">
-    <div class="card" id="hist-divs"><div class="empty-pos"><div class="empty-ico">💰</div><div class="empty-title">Sin dividendos registrados</div><div class="empty-sub">Registra tus distribuciones cada trimestre</div></div></div>
+    <!-- RESUMEN -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+      <div class="card" style="padding:16px 20px;">
+        <div class="rend-lbl">Total dividendos recibidos</div>
+        <div class="rend-val pos" id="div-total">$0.00</div>
+      </div>
+      <div class="card" style="padding:16px 20px;">
+        <div class="rend-lbl">ISR estimado (30%)</div>
+        <div class="rend-val neg" id="div-isr">$0.00</div>
+      </div>
+      <div class="card" style="padding:16px 20px;">
+        <div class="rend-lbl">Yield sobre costo real</div>
+        <div class="rend-val pos" id="div-yield-costo">0.00%</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <button class="btn btn-dark" onclick="openModal('modal-dividendo')">+ Registrar distribución</button>
+    </div>
+    <div class="card" id="hist-divs">
+      <div class="empty-pos">
+        <div class="empty-ico">💰</div>
+        <div class="empty-title">Sin dividendos registrados</div>
+        <div class="empty-sub">Registra cada distribución cuando te llegue el pago</div>
+      </div>
+    </div>
   </div>
   <div id="stab-movimientos" class="stab-content">
     <div class="card" id="hist-movs"><div class="empty-pos"><div class="empty-ico">📊</div><div class="empty-title">Sin movimientos</div></div></div>
@@ -638,154 +678,202 @@ input[type=range]{accent-color:var(--accent);}
   <!-- SCORE 5/5 — COMPRAR -->
   <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px;padding:4px 8px;background:var(--green-light);border-radius:5px;display:inline-block;">✓ Cumplen todos los criterios</div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-div">FUNO<br>11</div>
-    <div><div class="fibra-name">Fibra Uno</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val pos">8.44%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−41.6%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">95.7%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok" title="Y"></div><div class="cd cd-ok" title="N"></div><div class="cd cd-ok" title="O"></div><div class="cd cd-ok" title="L"></div><div class="cd cd-ok" title="A"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  <div class="fibra-card" onclick="toggleChart('FUNO11')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-div">FUNO<br>11</div>
+      <div><div class="fibra-name">Fibra Uno</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: ~Jun 30</div></div>
+      <div class="fm"><div class="fm-val pos">8.44%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−41.6%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">95.7%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FUNO11"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-com">DAN<br>HOS</div>
-    <div><div class="fibra-name">Danhos</div><div class="fibra-sec"><span class="tag tag-com">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span><span class="fiscal-rc" style="margin-left:3px;">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">6.42%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−32.8%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">91.9%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  <div class="fibra-card" onclick="toggleChart('DANHOS13')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-com">DAN<br>HOS</div>
+      <div><div class="fibra-name">Danhos</div><div class="fibra-sec"><span class="tag tag-com">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span><span class="fiscal-rc" style="margin-left:3px;">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 15</div></div>
+      <div class="fm"><div class="fm-val pos">6.42%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−32.8%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">91.9%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-DANHOS13"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico" style="background:#fef3c7;color:#92400e;">EDU<br>CA</div>
-    <div><div class="fibra-name">Fibra Educa</div><div class="fibra-sec"><span class="tag" style="background:#fef3c7;color:#92400e;">Educativo</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">7.20%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−18.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">98.0%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  <div class="fibra-card" onclick="toggleChart('EDUCA18')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fef3c7;color:#92400e;">EDU<br>CA</div>
+      <div><div class="fibra-name">Fibra Educa</div><div class="fibra-sec"><span class="tag" style="background:#fef3c7;color:#92400e;">Educativo</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 10</div></div>
+      <div class="fm"><div class="fm-val pos">7.20%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−18.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">98.0%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-EDUCA18"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-ind">NXT<br>25</div>
-    <div><div class="fibra-name">Fibra Next</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">6.80%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−22.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">97.7%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+  <div class="fibra-card" onclick="toggleChart('NEXT25')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-ind">NXT<br>25</div>
+      <div><div class="fibra-name">Fibra Next</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge exdiv-soon">🔴 Ex-div: Jul 3 — ¡próximo!</div></div>
+      <div class="fm"><div class="fm-val pos">6.80%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−22.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">97.7%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-buy">● Comprar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-NEXT25"></div>
   </div>
 
   <!-- SCORE 4/5 — OBSERVAR -->
   <div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--yellow-light);border-radius:5px;display:inline-block;">⚠ Con observaciones (4/5)</div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-ind">FMTY<br>14</div>
-    <div><div class="fibra-name">Fibra Mty</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">7.75%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val neg">+9.6%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">96.6%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-warn" title="Premio +9.6%"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  <div class="fibra-card" onclick="toggleChart('FMTY14')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-ind">FMTY<br>14</div>
+      <div><div class="fibra-name">Fibra Mty</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: mensual ~día 25</div></div>
+      <div class="fm"><div class="fm-val pos">7.75%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val neg">+9.6%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">96.6%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-warn"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FMTY14"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico" style="background:#fff7ed;color:#c2410c;">FSH<br>OP</div>
-    <div><div class="fibra-name">Fibra Shop</div><div class="fibra-sec"><span class="tag" style="background:#fff7ed;color:#c2410c;">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val pos">6.11%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−56.8%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">94.1%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn" title="LTV 39%"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  <div class="fibra-card" onclick="toggleChart('FSHOP13')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fff7ed;color:#c2410c;">FSH<br>OP</div>
+      <div><div class="fibra-name">Fibra Shop</div><div class="fibra-sec"><span class="tag" style="background:#fff7ed;color:#c2410c;">Comercial</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 20</div></div>
+      <div class="fm"><div class="fm-val pos">6.11%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−56.8%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">94.1%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FSHOP13"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-ind">FNO<br>VA</div>
-    <div><div class="fibra-name">Fibra Nova</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">5.90%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val neg">+53.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">95.0%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-fail" title="Premio +53%"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  <div class="fibra-card" onclick="toggleChart('FNOVA17')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-ind">FNO<br>VA</div>
+      <div><div class="fibra-name">Fibra Nova</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 8</div></div>
+      <div class="fm"><div class="fm-val pos">5.90%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val neg">+53.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">95.0%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FNOVA17"></div>
   </div>
 
-  <div class="fibra-card">
-    <div class="fibra-ico ico-div">FPL<br>US</div>
-    <div><div class="fibra-name">Fibra Plus</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">5.50%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−15.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">93.1%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn" title="AFFO ajustado"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+  <div class="fibra-card" onclick="toggleChart('FPLUS16')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-div">FPL<br>US</div>
+      <div><div class="fibra-name">Fibra Plus</div><div class="fibra-sec"><span class="tag tag-div">Diversificado</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 12</div></div>
+      <div class="fm"><div class="fm-val pos">5.50%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−15.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">93.1%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-watch">● Observar</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FPLUS16"></div>
   </div>
 
   <!-- SCORE 3/5 o menos — NO CUMPLE -->
   <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--red-light);border-radius:5px;display:inline-block;">✗ No cumplen criterios clave</div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico ico-ind">PL<br>14</div>
-    <div><div class="fibra-name">Fibra Prologis</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val neg">3.79%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val neu">−1.1%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">97.0%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FIBRAPL14')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico ico-ind">PL<br>14</div>
+      <div><div class="fibra-name">Fibra Prologis</div><div class="fibra-sec"><span class="tag tag-ind">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 5</div></div>
+      <div class="fm"><div class="fm-val neg">3.79%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val neu">−1.1%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">97.0%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FIBRAPL14"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#f3f0ff;color:#6c40d9;">TER<br>RA</div>
-    <div><div class="fibra-name">Terrafina</div><div class="fibra-sec"><span class="tag" style="background:#f3f0ff;color:#6c40d9;">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val neg">4.50%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−28.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val">94.5%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('TERRA13')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#f3f0ff;color:#6c40d9;">TER<br>RA</div>
+      <div><div class="fibra-name">Terrafina</div><div class="fibra-sec"><span class="tag" style="background:#f3f0ff;color:#6c40d9;">Industrial</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 18</div></div>
+      <div class="fm"><div class="fm-val neg">4.50%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−28.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val">94.5%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-TERRA13"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#e0f2fe;color:#0369a1;">FHI<br>PO</div>
-    <div><div class="fibra-name">FHipo</div><div class="fibra-sec"><span class="tag" style="background:#e0f2fe;color:#0369a1;">Hipotecario</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val neg">4.10%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−20.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neu">N/A</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FHIPO14')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#e0f2fe;color:#0369a1;">FHI<br>PO</div>
+      <div><div class="fibra-name">FHipo</div><div class="fibra-sec"><span class="tag" style="background:#e0f2fe;color:#0369a1;">Hipotecario</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 22</div></div>
+      <div class="fm"><div class="fm-val neg">4.10%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−20.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neu">N/A</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Yield bajo</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FHIPO14"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#f0fdf4;color:#166534;">STO<br>RE</div>
-    <div><div class="fibra-name">Fibra Storage</div><div class="fibra-sec"><span class="tag" style="background:#f0fdf4;color:#166534;">Almacenaje</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val pos">9.50%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−30.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neg">83.5%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-warn" title="Yield >9%"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Ocup. 83.5%"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Ocupación baja</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('STORAGE18')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#f0fdf4;color:#166534;">STO<br>RE</div>
+      <div><div class="fibra-name">Fibra Storage</div><div class="fibra-sec"><span class="tag" style="background:#f0fdf4;color:#166534;">Almacenaje</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: ~Jul 25</div></div>
+      <div class="fm"><div class="fm-val pos">9.50%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−30.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neg">83.5%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-warn"></div><div class="cd cd-ok"></div><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Ocupación baja</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-STORAGE18"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#fdf4ff;color:#7e22ce;">FMX<br>23</div>
-    <div><div class="fibra-name">Fibra MX</div><div class="fibra-sec"><span class="tag" style="background:#fdf4ff;color:#7e22ce;">Infraestructura</span> &nbsp;<span class="fiscal-rc">RC</span></div></div>
-    <div class="fm"><div class="fm-val neg">3.50%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Datos insuf.</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FMX23')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fdf4ff;color:#7e22ce;">FMX<br>23</div>
+      <div><div class="fibra-name">Fibra MX</div><div class="fibra-sec"><span class="tag" style="background:#fdf4ff;color:#7e22ce;">Infraestructura</span> &nbsp;<span class="fiscal-rc">RC</span></div><div class="exdiv-badge">📅 Ex-div: —</div></div>
+      <div class="fm"><div class="fm-val neg">3.50%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Datos insuf.</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FMX23"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#fff1f2;color:#be123c;">FCFE<br>18</div>
-    <div><div class="fibra-name">Fibra CFE</div><div class="fibra-sec"><span class="tag" style="background:#fff1f2;color:#be123c;">Energía</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Excluida</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FCFE18')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fff1f2;color:#be123c;">FCFE<br>18</div>
+      <div><div class="fibra-name">Fibra CFE</div><div class="fibra-sec"><span class="tag" style="background:#fff1f2;color:#be123c;">Energía</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: —</div></div>
+      <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neu">—</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Excluida</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FCFE18"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FINN<br>13</div>
-    <div><div class="fibra-name">Fibra Inn</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val pos">7.27%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−59.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neg">58.0%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Hotelero excluido"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FINN13')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FINN<br>13</div>
+      <div><div class="fibra-name">Fibra Inn</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: —</div></div>
+      <div class="fm"><div class="fm-val pos">7.27%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−59.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neg">58.0%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-ok"></div><div class="cd cd-ok"></div><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FINN13"></div>
   </div>
 
-  <div class="fibra-card" style="opacity:.65;">
-    <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FIH<br>O</div>
-    <div><div class="fibra-name">Fibra Hotel</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div></div>
-    <div class="fm"><div class="fm-val neg">4.80%</div><div class="fm-lbl">Yield</div></div>
-    <div class="fm"><div class="fm-val pos">−45.0%</div><div class="fm-lbl">vs NAV</div></div>
-    <div class="fm"><div class="fm-val neg">60.1%</div><div class="fm-lbl">Ocupación</div></div>
-    <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-fail" title="Hotelero excluido"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+  <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FIHO12')">
+    <div class="fibra-card-row">
+      <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FIH<br>O</div>
+      <div><div class="fibra-name">Fibra Hotel</div><div class="fibra-sec"><span class="tag" style="background:#fef9c3;color:#854d0e;">Hotelero</span> &nbsp;<span class="fiscal-rf">RF</span></div><div class="exdiv-badge">📅 Ex-div: —</div></div>
+      <div class="fm"><div class="fm-val neg">4.80%</div><div class="fm-lbl">Yield</div></div>
+      <div class="fm"><div class="fm-val pos">−45.0%</div><div class="fm-lbl">vs NAV</div></div>
+      <div class="fm"><div class="fm-val neg">60.1%</div><div class="fm-lbl">Ocupación</div></div>
+      <div><div class="crit-row"><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-fail"></div><div class="cd cd-ok"></div><div class="cd cd-warn"></div></div><span class="sig-badge sig-skip">✗ Sector excluido</span></div>
+    </div>
+    <div class="fibra-chart-panel" id="chart-FIHO12"></div>
   </div>
 
   <div class="divider"></div>
@@ -966,6 +1054,62 @@ input[type=range]{accent-color:var(--accent);}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-venta')">Cancelar</button>
       <button class="btn btn-danger" onclick="registrarVenta()">↑ Confirmar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DIVIDENDO -->
+<div class="modal-ov" id="modal-dividendo">
+  <div class="modal">
+    <div class="modal-title">Registrar distribución</div>
+    <div class="modal-sub">Ingresa los datos del pago que recibiste. Los encuentras en tu estado de cuenta de GBM o en ingresopasivo.mx.</div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">FIBRA</label>
+        <select id="dv-fibra">
+          <optgroup label="✓ Recomendadas">
+            <option>FUNO11</option><option>DANHOS13</option><option>EDUCA18</option><option>NEXT25</option>
+          </optgroup>
+          <optgroup label="Otras">
+            <option>FMTY14</option><option>FSHOP13</option><option>FNOVA17</option><option>FPLUS16</option>
+            <option>FIBRAPL14</option><option>TERRA13</option><option>FHIPO14</option><option>STORAGE18</option>
+            <option>FMX23</option><option>FCFE18</option><option>FINN13</option><option>FIHO12</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Fecha de pago</label><input type="date" id="dv-fecha"></div>
+    </div>
+    <div class="fg2">
+      <div class="fg"><label class="fl">CBFIs que tienes</label><input type="number" id="dv-cbfis" placeholder="200" oninput="calcDividendo()"></div>
+      <div class="fg"><label class="fl">Distribución por CBFI ($)</label><input type="number" id="dv-dist" placeholder="0.62" step="0.0001" oninput="calcDividendo()"></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Tipo de distribución</label>
+      <select id="dv-tipo" onchange="calcDividendo()">
+        <option value="rf">100% Resultado Fiscal (causa ISR 30%)</option>
+        <option value="rc">100% Reembolso de Capital (no causa ISR)</option>
+        <option value="mixto">Mixto — 50% RF / 50% RC</option>
+      </select>
+    </div>
+    <!-- PREVIEW -->
+    <div style="background:var(--bg);border-radius:var(--rsm);padding:14px 16px;margin-bottom:4px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Total recibido</div>
+          <div style="font-size:18px;font-weight:800;color:var(--green);" id="dv-preview-total">$0.00</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">ISR estimado</div>
+          <div style="font-size:18px;font-weight:800;color:var(--red);" id="dv-preview-isr">$0.00</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Neto recibido</div>
+          <div style="font-size:18px;font-weight:800;color:var(--accent);" id="dv-preview-neto">$0.00</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-dividendo')">Cancelar</button>
+      <button class="btn btn-success" onclick="registrarDividendo()">✓ Registrar pago</button>
     </div>
   </div>
 </div>
@@ -1237,6 +1381,203 @@ function calcSim() {
     h+=`<div class="hito"><div class="hito-val">${ok?Math.ceil(mh/12)+' años':'+50a'}</div><div class="hito-lbl">${fmt(meta)}/mes</div></div>`;
   });
   document.getElementById('sim-hitos').innerHTML=h;
+}
+
+// ── DIVIDENDOS ──
+function calcDividendo() {
+  const cbfis = parseFloat(document.getElementById('dv-cbfis').value) || 0;
+  const dist = parseFloat(document.getElementById('dv-dist').value) || 0;
+  const tipo = document.getElementById('dv-tipo').value;
+  const total = cbfis * dist;
+  let isr = 0;
+  if (tipo === 'rf') isr = total * 0.30;
+  else if (tipo === 'mixto') isr = total * 0.50 * 0.30;
+  const neto = total - isr;
+  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
+  document.getElementById('dv-preview-total').textContent = fmt(total);
+  document.getElementById('dv-preview-isr').textContent = fmt(isr);
+  document.getElementById('dv-preview-neto').textContent = fmt(neto);
+}
+
+function registrarDividendo() {
+  const fibra = document.getElementById('dv-fibra').value;
+  const fecha = document.getElementById('dv-fecha').value;
+  const cbfis = parseFloat(document.getElementById('dv-cbfis').value) || 0;
+  const dist = parseFloat(document.getElementById('dv-dist').value) || 0;
+  const tipo = document.getElementById('dv-tipo').value;
+  if (!fecha || !cbfis || !dist) return alert('Completa todos los campos.');
+  const total = cbfis * dist;
+  let isr = 0;
+  if (tipo === 'rf') isr = total * 0.30;
+  else if (tipo === 'mixto') isr = total * 0.50 * 0.30;
+  const neto = total - isr;
+  const div = { fibra, fecha, cbfis, dist, tipo, total, isr, neto, ts: Date.now() };
+  window.dividendos.push(div);
+  if (window.saveDividendo) window.saveDividendo(div);
+  renderDividendos();
+  closeModal('modal-dividendo');
+  // Reset preview
+  document.getElementById('dv-preview-total').textContent = '$0.00';
+  document.getElementById('dv-preview-isr').textContent = '$0.00';
+  document.getElementById('dv-preview-neto').textContent = '$0.00';
+}
+
+function renderDividendos() {
+  const divs = window.dividendos || [];
+  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
+  const totalRecibido = divs.reduce((a,d) => a + d.total, 0);
+  const totalISR = divs.reduce((a,d) => a + d.isr, 0);
+  const totalInv = (window.compras||[]).reduce((a,b) => a + b.monto, 0);
+  const yieldCosto = totalInv > 0 ? ((totalRecibido / totalInv) * 100).toFixed(2) : 0;
+
+  const elTotal = document.getElementById('div-total');
+  const elISR = document.getElementById('div-isr');
+  const elYield = document.getElementById('div-yield-costo');
+  if (elTotal) elTotal.textContent = fmt(totalRecibido);
+  if (elISR) elISR.textContent = fmt(totalISR);
+  if (elYield) elYield.textContent = yieldCosto + '%';
+
+  const hist = document.getElementById('hist-divs');
+  if (!hist) return;
+  if (divs.length === 0) {
+    hist.innerHTML = '<div class="empty-pos"><div class="empty-ico">💰</div><div class="empty-title">Sin dividendos registrados</div><div class="empty-sub">Registra cada distribución cuando te llegue el pago</div></div>';
+    return;
+  }
+  const tipoLabel = { rf: '🔴 RF', rc: '🟢 RC', mixto: '🟡 Mixto' };
+  let html = '<div style="padding:0 20px;">';
+  [...divs].reverse().forEach(d => {
+    html += `<div class="hist-item">
+      <div class="hist-dot hd-div">💰</div>
+      <div class="hist-info">
+        <div class="hist-title">${d.fibra} · ${d.cbfis} CBFIs × $${d.dist}/CBFI &nbsp; <span style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px;">${tipoLabel[d.tipo]||d.tipo}</span></div>
+        <div class="hist-date">${d.fecha} · ISR: ${fmt(d.isr)} · Neto: ${fmt(d.neto)}</div>
+      </div>
+      <div class="hist-amt pos">+${fmt(d.total)}</div>
+    </div>`;
+  });
+  html += '</div>';
+  hist.innerHTML = html;
+}
+
+// ── FACE ID / GUARDAR CREDENCIALES ──
+// Usamos la Web Authentication API (WebAuthn) para solicitar
+// al navegador que guarde y use biometría (Face ID / Touch ID / Windows Hello)
+async function setupBiometrics() {
+  if (!window.PublicKeyCredential) {
+    alert('Tu dispositivo no soporta autenticación biométrica.');
+    return;
+  }
+  try {
+    // Verificar disponibilidad de autenticador de plataforma (Face ID, Touch ID)
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if (!available) {
+      alert('No se detectó Face ID o Touch ID en este dispositivo.');
+      return;
+    }
+    // Crear credencial biométrica
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'FIBRAS App', id: location.hostname },
+        user: {
+          id: crypto.getRandomValues(new Uint8Array(16)),
+          name: document.getElementById('user-email').textContent,
+          displayName: 'Francisco'
+        },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required'
+        },
+        timeout: 60000
+      }
+    });
+    if (cred) {
+      localStorage.setItem('fbx_biometric', 'enabled');
+      alert('✓ Face ID / Touch ID configurado. La próxima vez que abras la app podrás usar biometría.');
+    }
+  } catch(e) {
+    if (e.name === 'NotAllowedError') alert('Cancelado. Puedes intentarlo de nuevo desde Configuración.');
+    else alert('No se pudo configurar: ' + e.message);
+  }
+}
+
+// ── CHART TOGGLE — TradingView Widget ──
+// TradingView BMV ticker format: FUNO/11, FMTY/14, etc.
+const TV_TICKERS = {
+  FUNO11:'BMV:FUNO%2F11', FMTY14:'BMV:FMTY%2F14', DANHOS13:'BMV:DANHOS%2F13',
+  FSHOP13:'BMV:FSHOP%2F13', FIBRAPL14:'BMV:FIBRAPL%2F14', FNOVA17:'BMV:FNOVA%2F17',
+  NEXT25:'BMV:NEXT%2F25', EDUCA18:'BMV:EDUCA%2F18', TERRA13:'BMV:TERRA%2F13',
+  FHIPO14:'BMV:FHIPO%2F14', STORAGE18:'BMV:STORAGE%2F18', FMX23:'BMV:FMX%2F23',
+  FCFE18:'BMV:FCFE%2F18', FINN13:'BMV:FINN%2F13', FIHO12:'BMV:FIHO%2F12', FPLUS16:'BMV:FPLUS%2F16'
+};
+
+let openChart = null;
+
+function toggleChart(ticker) {
+  event.stopPropagation();
+  const panel = document.getElementById('chart-' + ticker);
+  if (!panel) return;
+
+  // Close previous if different
+  if (openChart && openChart !== ticker) {
+    const prev = document.getElementById('chart-' + openChart);
+    if (prev) { prev.classList.remove('open'); prev.innerHTML = ''; }
+  }
+
+  if (panel.classList.contains('open')) {
+    panel.classList.remove('open');
+    panel.innerHTML = '';
+    openChart = null;
+    return;
+  }
+
+  panel.classList.add('open');
+  openChart = ticker;
+
+  const tvTicker = TV_TICKERS[ticker] || ('BMV:' + ticker);
+
+  panel.innerHTML = `
+    <div class="period-tabs">
+      <button class="ptab active" onclick="changePeriod('${ticker}','1D',this)">1D</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','5D',this)">5D</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','1M',this)">1M</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','6M',this)">6M</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','YTD',this)">YTD</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','1Y',this)">1A</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','5Y',this)">5A</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','ALL',this)">Todo</button>
+    </div>
+    <div id="tv-container-${ticker}" style="height:300px;border-radius:10px;overflow:hidden;">
+      <iframe
+        src="https://s.tradingview.com/widgetembed/?symbol=${tvTicker}&interval=D&range=1D&theme=light&style=3&locale=es&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0"
+        style="width:100%;height:100%;border:none;"
+        id="tv-frame-${ticker}"
+      ></iframe>
+    </div>
+    <div class="perf-grid" id="perf-${ticker}">
+      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Día</div></div>
+      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Semana</div></div>
+      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Mes</div></div>
+      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">YTD</div></div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right;">Datos: TradingView · BMV</div>
+  `;
+}
+
+function changePeriod(ticker, range, btn) {
+  event.stopPropagation();
+  document.querySelectorAll(`#chart-${ticker} .ptab`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const intervalMap = {'1D':'1','5D':'5','1M':'D','6M':'W','YTD':'W','1Y':'W','5Y':'M','ALL':'M'};
+  const interval = intervalMap[range] || 'D';
+  const tvTicker = TV_TICKERS[ticker] || ('BMV:' + ticker);
+
+  const frame = document.getElementById('tv-frame-' + ticker);
+  if (frame) {
+    frame.src = `https://s.tradingview.com/widgetembed/?symbol=${tvTicker}&interval=${interval}&range=${range}&theme=light&style=3&locale=es&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0`;
+  }
 }
 
 function applyUpdate() {
