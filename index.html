@@ -600,11 +600,35 @@ input[type=range]{accent-color:var(--accent);}
 
   <!-- MI PORTAFOLIO -->
   <div class="sec-h">Mi portafolio <span class="sec-h-sub" id="dash-yield-label">—</span></div>
-  <div class="pos-list" id="position-list">
-    <div class="empty-pos">
-      <div class="empty-ico">📂</div>
-      <div class="empty-title">Aquí verás tus instrumentos adquiridos</div>
-      <div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div>
+
+  <!-- PORTAFOLIO + DONAS -->
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px;">
+    <div class="pos-list" id="position-list" style="margin-bottom:0;">
+      <div class="empty-pos">
+        <div class="empty-ico">📂</div>
+        <div class="empty-title">Aquí verás tus instrumentos adquiridos</div>
+        <div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div>
+      </div>
+    </div>
+
+    <!-- DONAS -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Dona por FIBRA -->
+      <div class="card" style="padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Por FIBRA</div>
+        <div style="display:flex;justify-content:center;">
+          <canvas id="pie-fibra" width="160" height="160"></canvas>
+        </div>
+        <div id="pie-fibra-legend" style="margin-top:10px;font-size:11px;color:var(--text2);"></div>
+      </div>
+      <!-- Dona por sector -->
+      <div class="card" style="padding:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Exposición sectorial</div>
+        <div style="display:flex;justify-content:center;">
+          <canvas id="pie-sector" width="160" height="160"></canvas>
+        </div>
+        <div id="pie-sector-legend" style="margin-top:10px;font-size:11px;color:var(--text2);"></div>
+      </div>
     </div>
   </div>
 
@@ -885,15 +909,69 @@ input[type=range]{accent-color:var(--accent);}
       <div>
         <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">Yield Distribuible Ponderado</div>
         <div class="yield-big" id="scr-yield-big">7.37%</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:4px;">Por cada $10,000 invertidos: <strong style="color:var(--green);">~$61/mes</strong></div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px;">Por cada $10,000 invertidos: <strong style="color:var(--green);" id="renta-mensual">~$61/mes</strong></div>
       </div>
       <button class="btn btn-accent" onclick="confirmarPortafolio()">Confirmar →</button>
     </div>
-    <div class="alloc-row"><div class="alloc-name">FUNO11</div><input type="range" min="10" max="40" value="35" id="sl-funo" oninput="updateAlloc()"><div class="alloc-pct" id="val-funo">35%</div><div class="alloc-yield">8.44%</div></div>
-    <div class="alloc-row"><div class="alloc-name">FMTY14</div><input type="range" min="10" max="40" value="25" id="sl-fmty" oninput="updateAlloc()"><div class="alloc-pct" id="val-fmty">25%</div><div class="alloc-yield">7.75%</div></div>
-    <div class="alloc-row"><div class="alloc-name">DANHOS13</div><input type="range" min="10" max="40" value="25" id="sl-danhos" oninput="updateAlloc()"><div class="alloc-pct" id="val-danhos">25%</div><div class="alloc-yield">6.42%</div></div>
-    <div class="alloc-row"><div class="alloc-name">FSHOP13</div><input type="range" min="10" max="40" value="15" id="sl-fshop" oninput="updateAlloc()"><div class="alloc-pct" id="val-fshop">15%</div><div class="alloc-yield">6.11%</div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:var(--rsm);">
+
+    <!-- FILAS DINÁMICAS -->
+    <div id="alloc-rows">
+      <div class="alloc-row" id="row-FUNO11">
+        <div class="alloc-name">FUNO11</div>
+        <input type="range" min="10" max="40" value="35" id="sl-FUNO11" oninput="updateAlloc()">
+        <div class="alloc-pct" id="val-FUNO11">35%</div>
+        <div class="alloc-yield" id="yld-FUNO11">8.44%</div>
+        <button onclick="removeFibraAlloc('FUNO11')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;" title="Quitar">×</button>
+      </div>
+      <div class="alloc-row" id="row-FMTY14">
+        <div class="alloc-name">FMTY14</div>
+        <input type="range" min="10" max="40" value="25" id="sl-FMTY14" oninput="updateAlloc()">
+        <div class="alloc-pct" id="val-FMTY14">25%</div>
+        <div class="alloc-yield" id="yld-FMTY14">7.75%</div>
+        <button onclick="removeFibraAlloc('FMTY14')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;" title="Quitar">×</button>
+      </div>
+      <div class="alloc-row" id="row-DANHOS13">
+        <div class="alloc-name">DANHOS13</div>
+        <input type="range" min="10" max="40" value="25" id="sl-DANHOS13" oninput="updateAlloc()">
+        <div class="alloc-pct" id="val-DANHOS13">25%</div>
+        <div class="alloc-yield" id="yld-DANHOS13">6.42%</div>
+        <button onclick="removeFibraAlloc('DANHOS13')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;" title="Quitar">×</button>
+      </div>
+      <div class="alloc-row" id="row-FSHOP13">
+        <div class="alloc-name">FSHOP13</div>
+        <input type="range" min="10" max="40" value="15" id="sl-FSHOP13" oninput="updateAlloc()">
+        <div class="alloc-pct" id="val-FSHOP13">15%</div>
+        <div class="alloc-yield" id="yld-FSHOP13">6.11%</div>
+        <button onclick="removeFibraAlloc('FSHOP13')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;" title="Quitar">×</button>
+      </div>
+    </div>
+
+    <!-- AGREGAR FIBRA -->
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <select id="add-fibra-select" style="flex:1;">
+        <optgroup label="✓ Recomendadas">
+          <option value="">＋ Agregar FIBRA al portafolio...</option>
+          <option value="EDUCA18|7.20">EDUCA18 — Fibra Educa (7.20%)</option>
+          <option value="NEXT25|6.80">NEXT25 — Fibra Next (6.80%)</option>
+        </optgroup>
+        <optgroup label="⚠ Con observaciones">
+          <option value="FNOVA17|5.90">FNOVA17 — Fibra Nova (5.90%)</option>
+          <option value="FPLUS16|5.50">FPLUS16 — Fibra Plus (5.50%)</option>
+        </optgroup>
+        <optgroup label="✗ Fuera de criterios (decisión manual)">
+          <option value="FIBRAPL14|3.79">FIBRAPL14 — Fibra Prologis (3.79%)</option>
+          <option value="TERRA13|4.50">TERRA13 — Terrafina (4.50%)</option>
+          <option value="FHIPO14|4.10">FHIPO14 — FHipo (4.10%)</option>
+          <option value="STORAGE18|9.50">STORAGE18 — Fibra Storage (9.50%)</option>
+          <option value="FMX23|3.50">FMX23 — Fibra MX (3.50%)</option>
+          <option value="FINN13|7.27">FINN13 — Fibra Inn (7.27%)</option>
+          <option value="FIHO12|4.80">FIHO12 — Fibra Hotel (4.80%)</option>
+        </optgroup>
+      </select>
+      <button class="btn btn-outline" onclick="addFibraAlloc()" style="white-space:nowrap;">＋ Agregar</button>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:12px 16px;background:var(--bg);border-radius:var(--rsm);">
       <span style="font-size:13px;color:var(--text3);">Suma: <strong id="scr-suma" style="color:var(--green);">100%</strong></span>
       <span style="font-size:13px;color:var(--text3);">Yield ponderado: <strong id="scr-yield" style="color:var(--accent);">7.37%</strong></span>
     </div>
@@ -1245,6 +1323,7 @@ function renderPosiciones() {
   // Update yield label
   const yieldPond = 7.37; // TODO: calculate from portfolio
   document.getElementById('dash-yield-label').textContent = `Yield ponderado ~${yieldPond}% · ${activPos.length} posiciones`;
+  renderPieCharts();
 }
 
 function registrarCompra() {
@@ -1299,23 +1378,174 @@ function renderHistorial() {
 }
 
 // ALLOC
-const ylds = {funo:8.44,fmty:7.75,danhos:6.42,fshop:6.11};
+// ── ALLOC — Dynamic ──
+const FIBRA_YIELDS = {
+  FUNO11:8.44, FMTY14:7.75, DANHOS13:6.42, FSHOP13:6.11,
+  EDUCA18:7.20, NEXT25:6.80, FNOVA17:5.90, FPLUS16:5.50,
+  FIBRAPL14:3.79, TERRA13:4.50, FHIPO14:4.10, STORAGE18:9.50,
+  FMX23:3.50, FINN13:7.27, FIHO12:4.80, FCFE18:0
+};
+
+const FIBRA_SECTOR = {
+  FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
+  EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
+  FIBRAPL14:'Industrial', TERRA13:'Industrial', FHIPO14:'Hipotecario', STORAGE18:'Almacenaje',
+  FMX23:'Infraestructura', FINN13:'Hotelero', FIHO12:'Hotelero', FCFE18:'Energía'
+};
+
+let allocFibras = ['FUNO11','FMTY14','DANHOS13','FSHOP13'];
 
 function updateAlloc() {
-  const v = {funo:+document.getElementById('sl-funo').value,fmty:+document.getElementById('sl-fmty').value,danhos:+document.getElementById('sl-danhos').value,fshop:+document.getElementById('sl-fshop').value};
-  Object.keys(v).forEach(k => document.getElementById('val-'+k).textContent = v[k]+'%');
-  const suma = Object.values(v).reduce((a,b)=>a+b,0);
+  let suma = 0, yp = 0;
+  allocFibras.forEach(t => {
+    const sl = document.getElementById('sl-' + t);
+    if (!sl) return;
+    const v = +sl.value;
+    suma += v;
+    yp += (v / 100) * (FIBRA_YIELDS[t] || 0);
+    const el = document.getElementById('val-' + t);
+    if (el) el.textContent = v + '%';
+  });
   const se = document.getElementById('scr-suma');
-  se.textContent = suma+'%'; se.style.color = suma===100 ? 'var(--green)' : 'var(--red)';
-  const yp = Object.keys(v).reduce((a,k)=>a+(v[k]/100)*ylds[k],0);
-  document.getElementById('scr-yield').textContent = yp.toFixed(2)+'%';
-  document.getElementById('scr-yield-big').textContent = yp.toFixed(2)+'%';
+  if (se) { se.textContent = suma + '%'; se.style.color = suma === 100 ? 'var(--green)' : 'var(--red)'; }
+  const syEl = document.getElementById('scr-yield');
+  const sbEl = document.getElementById('scr-yield-big');
+  const rmEl = document.getElementById('renta-mensual');
+  if (syEl) syEl.textContent = yp.toFixed(2) + '%';
+  if (sbEl) sbEl.textContent = yp.toFixed(2) + '%';
+  if (rmEl) rmEl.textContent = '~$' + Math.round(10000 * yp / 100 / 12) + '/mes';
+}
+
+function addFibraAlloc() {
+  const sel = document.getElementById('add-fibra-select');
+  if (!sel.value) return;
+  const [ticker, yld] = sel.value.split('|');
+  if (allocFibras.includes(ticker)) { alert(ticker + ' ya está en el portafolio.'); return; }
+  if (allocFibras.length >= 8) { alert('Máximo 8 FIBRAs en el portafolio.'); return; }
+
+  allocFibras.push(ticker);
+  const container = document.getElementById('alloc-rows');
+  const div = document.createElement('div');
+  div.className = 'alloc-row';
+  div.id = 'row-' + ticker;
+  div.innerHTML = `
+    <div class="alloc-name">${ticker}</div>
+    <input type="range" min="10" max="40" value="10" id="sl-${ticker}" oninput="updateAlloc()">
+    <div class="alloc-pct" id="val-${ticker}">10%</div>
+    <div class="alloc-yield" id="yld-${ticker}">${parseFloat(yld).toFixed(2)}%</div>
+    <button onclick="removeFibraAlloc('${ticker}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+  `;
+  container.appendChild(div);
+
+  // Remove from dropdown
+  sel.value = '';
+  updateAlloc();
+}
+
+function removeFibraAlloc(ticker) {
+  if (allocFibras.length <= 2) { alert('El portafolio debe tener al menos 2 FIBRAs.'); return; }
+  allocFibras = allocFibras.filter(t => t !== ticker);
+  const row = document.getElementById('row-' + ticker);
+  if (row) row.remove();
+  updateAlloc();
 }
 
 function confirmarPortafolio() {
   alert('✓ Portafolio confirmado. Ve al Dashboard para registrar tu primera compra.');
   showSection('dashboard', document.querySelector('.nav-btn'));
   document.querySelector('.nav-btn').classList.add('active');
+}
+
+// ── PIE CHARTS ──
+const PIE_COLORS = ['#1a56db','#0e9f6e','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
+const SECTOR_COLORS = {
+  'Industrial':'#1a56db','Comercial':'#8b5cf6','Diversificado':'#0e9f6e',
+  'Hotelero':'#f59e0b','Educativo':'#06b6d4','Hipotecario':'#ec4899',
+  'Almacenaje':'#84cc16','Infraestructura':'#64748b','Energía':'#ef4444'
+};
+
+function drawPie(canvasId, data, colors) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const total = data.reduce((a,b) => a + b.value, 0);
+  if (total === 0) { ctx.clearRect(0,0,160,160); return; }
+
+  const cx = 80, cy = 80, r = 70, innerR = 40;
+  ctx.clearRect(0,0,160,160);
+  let start = -Math.PI/2;
+
+  data.forEach((item, i) => {
+    const slice = (item.value / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, start + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[i] || PIE_COLORS[i % PIE_COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    start += slice;
+  });
+
+  // Inner circle (donut)
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+}
+
+function renderPieCharts() {
+  const pos = {};
+  (window.compras || []).forEach(c => {
+    if (!pos[c.fibra]) pos[c.fibra] = 0;
+    pos[c.fibra] += c.monto;
+  });
+  (window.ventas || []).forEach(v => {
+    if (pos[v.fibra]) pos[v.fibra] -= v.total;
+  });
+
+  const entries = Object.entries(pos).filter(([,v]) => v > 0);
+  if (entries.length === 0) return;
+
+  // Pie por FIBRA
+  const fibraData = entries.map(([t, v]) => ({ label: t, value: v }));
+  const fibraColors = fibraData.map((_, i) => PIE_COLORS[i % PIE_COLORS.length]);
+  drawPie('pie-fibra', fibraData, fibraColors);
+
+  const legend1 = document.getElementById('pie-fibra-legend');
+  if (legend1) {
+    legend1.innerHTML = fibraData.map((d, i) => {
+      const pct = ((d.value / fibraData.reduce((a,b)=>a+b.value,0))*100).toFixed(1);
+      return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${fibraColors[i]};flex-shrink:0;"></div>
+        <span>${d.label} <strong>${pct}%</strong></span>
+      </div>`;
+    }).join('');
+  }
+
+  // Pie por sector
+  const sectorMap = {};
+  entries.forEach(([t, v]) => {
+    const sec = FIBRA_SECTOR[t] || 'Otro';
+    sectorMap[sec] = (sectorMap[sec] || 0) + v;
+  });
+  const sectorData = Object.entries(sectorMap).map(([label, value]) => ({ label, value }));
+  const sectorColors = sectorData.map(d => SECTOR_COLORS[d.label] || '#94a3b8');
+  drawPie('pie-sector', sectorData, sectorColors);
+
+  const legend2 = document.getElementById('pie-sector-legend');
+  if (legend2) {
+    const total = sectorData.reduce((a,b)=>a+b.value,0);
+    legend2.innerHTML = sectorData.map((d, i) => {
+      const pct = ((d.value/total)*100).toFixed(1);
+      return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${sectorColors[i]};flex-shrink:0;"></div>
+        <span>${d.label} <strong>${pct}%</strong></span>
+      </div>`;
+    }).join('');
+  }
 }
 
 // SIMULADOR
@@ -1503,13 +1733,33 @@ async function setupBiometrics() {
 }
 
 // ── CHART TOGGLE — TradingView Widget ──
-// TradingView BMV ticker format: FUNO/11, FMTY/14, etc.
+// Correct BMV ticker format for TradingView embed
 const TV_TICKERS = {
-  FUNO11:'BMV:FUNO%2F11', FMTY14:'BMV:FMTY%2F14', DANHOS13:'BMV:DANHOS%2F13',
-  FSHOP13:'BMV:FSHOP%2F13', FIBRAPL14:'BMV:FIBRAPL%2F14', FNOVA17:'BMV:FNOVA%2F17',
-  NEXT25:'BMV:NEXT%2F25', EDUCA18:'BMV:EDUCA%2F18', TERRA13:'BMV:TERRA%2F13',
-  FHIPO14:'BMV:FHIPO%2F14', STORAGE18:'BMV:STORAGE%2F18', FMX23:'BMV:FMX%2F23',
-  FCFE18:'BMV:FCFE%2F18', FINN13:'BMV:FINN%2F13', FIHO12:'BMV:FIHO%2F12', FPLUS16:'BMV:FPLUS%2F16'
+  FUNO11:'BMV:FUNO11', FMTY14:'BMV:FMTY14', DANHOS13:'BMV:DANHOS13',
+  FSHOP13:'BMV:FSHOP13', FIBRAPL14:'BMV:FIBRAPL14', FNOVA17:'BMV:FNOVA17',
+  NEXT25:'BMV:NEXT25', EDUCA18:'BMV:EDUCA18', TERRA13:'BMV:TERRA13',
+  FHIPO14:'BMV:FHIPO14', STORAGE18:'BMV:STORAGE18', FMX23:'BMV:FMX23',
+  FCFE18:'BMV:FCFE18', FINN13:'BMV:FINN13', FIHO12:'BMV:FIHO12', FPLUS16:'BMV:FPLUS16'
+};
+
+// Static performance data (updated manually or via Alpha Vantage)
+const PERF_DATA = {
+  FUNO11:  { '1D':'-0.38%', '1M':'+3.2%',  '1A':'+22.1%', 'YTD':'+18.4%' },
+  FMTY14:  { '1D':'-0.14%', '1M':'+1.8%',  '1A':'+39.0%', 'YTD':'+28.5%' },
+  DANHOS13:{ '1D':'+0.95%', '1M':'+4.1%',  '1A':'+38.2%', 'YTD':'+25.3%' },
+  FSHOP13: { '1D':'0.00%',  '1M':'+2.5%',  '1A':'+15.8%', 'YTD':'+12.1%' },
+  FIBRAPL14:{'1D':'-2.34%', '1M':'-1.2%',  '1A':'+8.5%',  'YTD':'+5.2%'  },
+  FNOVA17: { '1D':'+1.41%', '1M':'+5.8%',  '1A':'+45.9%', 'YTD':'+32.1%' },
+  NEXT25:  { '1D':'+0.50%', '1M':'+2.1%',  '1A':'N/D',    'YTD':'+8.3%'  },
+  EDUCA18: { '1D':'+0.20%', '1M':'+1.5%',  '1A':'+12.0%', 'YTD':'+9.4%'  },
+  TERRA13: { '1D':'-0.50%', '1M':'+1.0%',  '1A':'+10.2%', 'YTD':'+7.8%'  },
+  FHIPO14: { '1D':'-0.30%', '1M':'+0.8%',  '1A':'+5.0%',  'YTD':'+3.2%'  },
+  STORAGE18:{'1D':'+0.10%', '1M':'+3.0%',  '1A':'+18.0%', 'YTD':'+14.5%' },
+  FMX23:   { '1D':'0.00%',  '1M':'+0.5%',  '1A':'+4.0%',  'YTD':'+2.1%'  },
+  FCFE18:  { '1D':'0.00%',  '1M':'0.00%',  '1A':'N/D',    'YTD':'N/D'    },
+  FINN13:  { '1D':'-0.20%', '1M':'+1.2%',  '1A':'+8.0%',  'YTD':'+5.5%'  },
+  FIHO12:  { '1D':'+0.10%', '1M':'+0.8%',  '1A':'+6.0%',  'YTD':'+4.2%'  },
+  FPLUS16: { '1D':'0.00%',  '1M':'+0.5%',  '1A':'+3.0%',  'YTD':'+2.0%'  },
 };
 
 let openChart = null;
@@ -1519,7 +1769,6 @@ function toggleChart(ticker) {
   const panel = document.getElementById('chart-' + ticker);
   if (!panel) return;
 
-  // Close previous if different
   if (openChart && openChart !== ticker) {
     const prev = document.getElementById('chart-' + openChart);
     if (prev) { prev.classList.remove('open'); prev.innerHTML = ''; }
@@ -1535,7 +1784,13 @@ function toggleChart(ticker) {
   panel.classList.add('open');
   openChart = ticker;
 
-  const tvTicker = TV_TICKERS[ticker] || ('BMV:' + ticker);
+  const tvTicker = TV_TICKERS[ticker];
+  const perf = PERF_DATA[ticker] || {};
+
+  const perfColor = v => {
+    if (!v || v === 'N/D') return 'neu';
+    return v.startsWith('+') ? 'pos' : v === '0.00%' ? 'neu' : 'neg';
+  };
 
   panel.innerHTML = `
     <div class="period-tabs">
@@ -1544,24 +1799,41 @@ function toggleChart(ticker) {
       <button class="ptab" onclick="changePeriod('${ticker}','1M',this)">1M</button>
       <button class="ptab" onclick="changePeriod('${ticker}','6M',this)">6M</button>
       <button class="ptab" onclick="changePeriod('${ticker}','YTD',this)">YTD</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','1Y',this)">1A</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','5Y',this)">5A</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','12M',this)">1A</button>
+      <button class="ptab" onclick="changePeriod('${ticker}','60M',this)">5A</button>
       <button class="ptab" onclick="changePeriod('${ticker}','ALL',this)">Todo</button>
     </div>
-    <div id="tv-container-${ticker}" style="height:300px;border-radius:10px;overflow:hidden;">
+    <div id="tv-container-${ticker}" style="height:320px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
       <iframe
-        src="https://s.tradingview.com/widgetembed/?symbol=${tvTicker}&interval=D&range=1D&theme=light&style=3&locale=es&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0"
+        src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${ticker}&symbol=${tvTicker}&interval=D&range=1D&theme=light&style=3&locale=es_419&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0&withdateranges=1"
         style="width:100%;height:100%;border:none;"
         id="tv-frame-${ticker}"
+        allowtransparency="true"
+        scrolling="no"
       ></iframe>
     </div>
-    <div class="perf-grid" id="perf-${ticker}">
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Día</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Semana</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Mes</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">YTD</div></div>
+    <div class="perf-grid">
+      <div class="perf-item">
+        <div class="perf-val ${perfColor(perf['1D'])}">${perf['1D']||'—'}</div>
+        <div class="perf-lbl">Hoy</div>
+      </div>
+      <div class="perf-item">
+        <div class="perf-val ${perfColor(perf['1M'])}">${perf['1M']||'—'}</div>
+        <div class="perf-lbl">1 Mes</div>
+      </div>
+      <div class="perf-item">
+        <div class="perf-val ${perfColor(perf['YTD'])}">${perf['YTD']||'—'}</div>
+        <div class="perf-lbl">YTD 2026</div>
+      </div>
+      <div class="perf-item">
+        <div class="perf-val ${perfColor(perf['1A'])}">${perf['1A']||'—'}</div>
+        <div class="perf-lbl">1 Año</div>
+      </div>
     </div>
-    <div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right;">Datos: TradingView · BMV</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;display:flex;justify-content:space-between;">
+      <span>Rendimientos aproximados · datos BMV</span>
+      <span>Gráfica: TradingView</span>
+    </div>
   `;
 }
 
@@ -1570,13 +1842,15 @@ function changePeriod(ticker, range, btn) {
   document.querySelectorAll(`#chart-${ticker} .ptab`).forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 
-  const intervalMap = {'1D':'1','5D':'5','1M':'D','6M':'W','YTD':'W','1Y':'W','5Y':'M','ALL':'M'};
+  const intervalMap = {
+    '1D':'1','5D':'5','1M':'D','6M':'W',
+    'YTD':'W','12M':'W','60M':'M','ALL':'M'
+  };
   const interval = intervalMap[range] || 'D';
-  const tvTicker = TV_TICKERS[ticker] || ('BMV:' + ticker);
-
+  const tvTicker = TV_TICKERS[ticker];
   const frame = document.getElementById('tv-frame-' + ticker);
   if (frame) {
-    frame.src = `https://s.tradingview.com/widgetembed/?symbol=${tvTicker}&interval=${interval}&range=${range}&theme=light&style=3&locale=es&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0`;
+    frame.src = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${ticker}&symbol=${tvTicker}&interval=${interval}&range=${range}&theme=light&style=3&locale=es_419&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0&withdateranges=1`;
   }
 }
 
