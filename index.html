@@ -1281,11 +1281,27 @@ function renderHistorial() {
   const c = window.compras||[], v = window.ventas||[];
   const totalInv = c.reduce((a,b)=>a+b.monto,0);
   let html = '<div style="padding:0 20px;">';
-  [...c].reverse().forEach(x => {
-    html += `<div class="hist-item"><div class="hist-dot hd-buy">🛒</div><div class="hist-info"><div class="hist-title">Compra · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt pos">+${fmt(x.monto)}</div></div>`;
+  [...c].reverse().forEach((x, i) => {
+    const idx = c.length - 1 - i;
+    html += `<div class="hist-item">
+      <div class="hist-dot hd-buy">🛒</div>
+      <div class="hist-info"><div class="hist-title">Compra · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="hist-amt pos">+${fmt(x.monto)}</div>
+        <button onclick="eliminarCompra(${idx})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;transition:all .15s;" onmouseover="this.style.background='var(--red-light)';this.style.color='var(--red)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'" title="Eliminar">🗑</button>
+      </div>
+    </div>`;
   });
-  [...v].reverse().forEach(x => {
-    html += `<div class="hist-item"><div class="hist-dot hd-sell">💸</div><div class="hist-info"><div class="hist-title">Venta · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt neg">−${fmt(x.total)}</div></div>`;
+  [...v].reverse().forEach((x, i) => {
+    const idx = v.length - 1 - i;
+    html += `<div class="hist-item">
+      <div class="hist-dot hd-sell">💸</div>
+      <div class="hist-info"><div class="hist-title">Venta · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="hist-amt neg">−${fmt(x.total)}</div>
+        <button onclick="eliminarVenta(${idx})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px;transition:all .15s;" onmouseover="this.style.background='var(--red-light)';this.style.color='var(--red)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'" title="Eliminar">🗑</button>
+      </div>
+    </div>`;
   });
   html += '</div>';
   if (c.length===0 && v.length===0) html = '<div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones</div></div>';
@@ -1478,7 +1494,24 @@ function removeFibraAlloc(ticker) {
   updateAlloc();
 }
 
-function confirmarPortafolio() {
+function eliminarCompra(idx) {
+  if (!confirm('¿Eliminar esta compra? Se borrará del historial y del portafolio.')) return;
+  window.compras.splice(idx, 1);
+  // Sync con Firebase
+  const uid = typeof auth !== 'undefined' ? auth.currentUser?.uid : null;
+  if (uid) db.collection('usuarios').doc(uid).update({ compras: window.compras });
+  renderHistorial();
+  renderPosiciones();
+}
+
+function eliminarVenta(idx) {
+  if (!confirm('¿Eliminar esta venta? Se borrará del historial.')) return;
+  window.ventas.splice(idx, 1);
+  const uid = typeof auth !== 'undefined' ? auth.currentUser?.uid : null;
+  if (uid) db.collection('usuarios').doc(uid).update({ ventas: window.ventas });
+  renderHistorial();
+  renderPosiciones();
+}
   alert('✓ Portafolio confirmado. Ve al Dashboard para registrar tu primera compra.');
   showSection('dashboard',document.querySelectorAll('.nav-btn')[0]);
   document.querySelectorAll('.nav-btn')[0].classList.add('active');
