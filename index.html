@@ -23,7 +23,7 @@ const db = firebase.firestore();
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 const AV_KEY = '1FBQIUMATVPSMZVF';
 const chartCache = {};
- 
+
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     document.getElementById('login-screen').style.display = 'none';
@@ -36,7 +36,7 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('app-screen').style.display = 'none';
   }
 });
- 
+
 function doLogin() {
   const email = document.getElementById('login-email').value;
   const pass = document.getElementById('login-pass').value;
@@ -45,7 +45,7 @@ function doLogin() {
   auth.signInWithEmailAndPassword(email, pass)
     .catch(() => { err.textContent = 'Correo o contraseña incorrectos.'; });
 }
- 
+
 function doRegister() {
   const email = document.getElementById('login-email').value;
   const pass = document.getElementById('login-pass').value;
@@ -61,9 +61,9 @@ function doRegister() {
       else err.textContent = 'Error: ' + e.message;
     });
 }
- 
+
 function doLogout() { auth.signOut(); }
- 
+
 async function loadUserData(uid) {
   const snap = await db.collection('usuarios').doc(uid).get();
   if (snap.exists) {
@@ -81,7 +81,7 @@ async function loadUserData(uid) {
     window.compras = []; window.ventas = []; window.dividendos = [];
   }
 }
- 
+
 function saveCompra(c) {
   const uid = auth.currentUser?.uid;
   if (uid) db.collection('usuarios').doc(uid).update({ compras: firebase.firestore.FieldValue.arrayUnion(c) });
@@ -94,7 +94,7 @@ function saveDividendo(d) {
   const uid = auth.currentUser?.uid;
   if (uid) db.collection('usuarios').doc(uid).update({ dividendos: firebase.firestore.FieldValue.arrayUnion(d) });
 }
- 
+
 async function fetchPrices() {
   const el = document.getElementById('last-update');
   if (el) el.textContent = 'Actualizando precios...';
@@ -137,7 +137,7 @@ async function fetchPrices() {
   const c = Object.keys(prices).length;
   if (el) el.textContent = c > 0 ? `Precios actualizados ${t} · ${c} FIBRAs en vivo` : `Precios estáticos · ${t}`;
 }
- 
+
 async function fetchChartData(ticker) {
   const cached = chartCache[ticker];
   if (cached && (Date.now() - cached.ts) < 3600000) return cached.data;
@@ -177,7 +177,7 @@ async function fetchChartData(ticker) {
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
- 
+
 /* LOGIN SCREEN */
 #login-screen {
   display:flex;
@@ -186,9 +186,9 @@ async function fetchChartData(ticker) {
   align-items:center;
   justify-content:center;
 }
- 
+
 #app-screen { display:none; width:100%; }
- 
+
 .login-card {
   background:white;
   border-radius:20px;
@@ -197,7 +197,7 @@ async function fetchChartData(ticker) {
   box-shadow:0 8px 32px rgba(0,0,0,0.1);
   text-align:center;
 }
- 
+
 .login-logo {
   width:48px;height:48px;
   background:#1a56db;
@@ -206,10 +206,10 @@ async function fetchChartData(ticker) {
   color:white;font-weight:800;font-size:16px;
   margin:0 auto 20px;
 }
- 
+
 .login-title { font-size:20px;font-weight:700;margin-bottom:6px; }
 .login-sub { font-size:13px;color:#9aa3b0;margin-bottom:28px; }
- 
+
 .login-input {
   width:100%;
   background:#f5f7fa;
@@ -221,10 +221,10 @@ async function fetchChartData(ticker) {
   margin-bottom:12px;
   transition:border-color .15s;
 }
- 
+
 .login-input:focus { outline:none;border-color:#1a56db;background:white; }
 .login-err { font-size:12px;color:#e02424;margin-bottom:10px;min-height:18px; }
- 
+
 .login-btn-primary {
   width:100%;padding:13px;
   background:#1a56db;color:white;
@@ -234,7 +234,7 @@ async function fetchChartData(ticker) {
   margin-bottom:10px;transition:background .15s;
 }
 .login-btn-primary:hover { background:#1648c0; }
- 
+
 .login-btn-secondary {
   width:100%;padding:12px;
   background:#f5f7fa;color:#5a6478;
@@ -244,7 +244,7 @@ async function fetchChartData(ticker) {
   transition:background .15s;
 }
 .login-btn-secondary:hover { background:#e8ecf2; }
- 
+
 .login-divider {
   display:flex;align-items:center;gap:12px;
   margin:16px 0;color:#b0b8c9;font-size:12px;
@@ -266,7 +266,7 @@ async function fetchChartData(ticker) {
   --sans:'Inter',sans-serif;
 }
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
- 
+
 /* SIDEBAR */
 .sidebar{width:72px;min-height:100vh;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:20px 0;position:fixed;top:0;left:0;bottom:0;z-index:100;gap:4px;}
 .logo-mark{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:13px;margin-bottom:16px;}
@@ -276,21 +276,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .nav-tt{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);background:var(--text);color:white;font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.15s;}
 .nav-btn:hover .nav-tt{opacity:1;}
 .sb-spacer{flex:1;}
- 
+
 /* MAIN */
 .main{margin-left:72px;flex:1;min-height:100vh;padding:28px;}
 .section{display:none;}
 .section.active{display:block;}
- 
+
 /* PAGE HEADER */
 .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
 .ph-title{font-size:22px;font-weight:700;}
 .ph-sub{font-size:13px;color:var(--text3);margin-top:2px;}
 .ph-right{display:flex;gap:10px;}
- 
+
 /* CARD */
 .card{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);}
- 
+
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:40px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--sans);transition:all 0.15s;}
 .btn-dark{background:var(--text);color:white;}
@@ -301,7 +301,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .btn-accent:hover{background:#1648c0;}
 .btn-danger{background:var(--red);color:white;}
 .btn-success{background:var(--green);color:white;}
- 
+
 /* PORTFOLIO HERO */
 .hero{background:var(--white);border-radius:var(--r);padding:28px 32px;box-shadow:var(--shadow);margin-bottom:16px;}
 .hero-val{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1;}
@@ -311,22 +311,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .rend-lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
 .rend-val{font-size:15px;font-weight:700;}
 .rend-pct{font-size:12px;font-weight:500;margin-top:2px;}
- 
+
 /* CHART */
 .chart-wrap{height:150px;margin-top:24px;position:relative;}
 .chart-tabs{display:flex;gap:4px;margin-top:10px;}
 .ctab{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);font-family:var(--sans);}
 .ctab.active{background:var(--text);color:white;}
- 
+
 /* DISPONIBLE */
 .disp-bar{background:var(--white);border-radius:var(--rsm);padding:16px 20px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .disp-lbl{font-size:12px;color:var(--text3);margin-bottom:3px;}
 .disp-val{font-size:22px;font-weight:700;}
- 
+
 /* SECTION HEADING */
 .sec-h{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
 .sec-h-sub{font-size:12px;color:var(--text3);font-weight:400;}
- 
+
 /* POSITION LIST */
 .pos-list{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
 .pos-row{display:grid;grid-template-columns:44px 1fr auto auto auto;gap:16px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
@@ -345,7 +345,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .empty-ico{font-size:28px;margin-bottom:10px;}
 .empty-title{font-size:14px;font-weight:500;color:var(--text2);}
 .empty-sub{font-size:12px;margin-top:4px;}
- 
+
 /* SUBTABS */
 .subtabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;}
 .stab{padding:10px 20px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;font-family:var(--sans);}
@@ -353,7 +353,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .stab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .stab-content{display:none;}
 .stab-content.active{display:block;}
- 
+
 /* HIST ITEM */
 .hist-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
 .hist-item:last-child{border-bottom:none;}
@@ -365,7 +365,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .hist-title{font-size:13px;font-weight:600;}
 .hist-date{font-size:11px;color:var(--text3);margin-top:2px;}
 .hist-amt{font-size:14px;font-weight:700;}
- 
+
 /* FORM */
 .fg{margin-bottom:16px;}
 .fl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block;}
@@ -373,7 +373,7 @@ input[type=number],input[type=text],input[type=date],select,textarea{width:100%;
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:white;}
 .fg2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
- 
+
 /* SCREENING */
 .fibra-card{background:var(--white);border-radius:var(--r);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:12px;transition:box-shadow .15s;cursor:pointer;}
 .fibra-card:hover{box-shadow:var(--shadow-md);}
@@ -404,7 +404,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .cd-ok{background:var(--green);}
 .cd-warn{background:var(--yellow);}
 .cd-fail{background:var(--red);}
- 
+
 /* TAGS */
 .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
 .tag-ind{background:var(--accent-light);color:var(--accent);}
@@ -412,7 +412,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .tag-div{background:var(--green-light);color:var(--green);}
 .fiscal-rf{background:var(--red-light);color:var(--red);padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;}
 .fiscal-rc{background:var(--green-light);color:var(--green);padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;}
- 
+
 /* PROPUESTA */
 .prop-card{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);margin-bottom:16px;}
 .yield-hl{background:linear-gradient(135deg,var(--accent-light),#f0f4ff);border:1.5px solid rgba(26,86,219,.2);border-radius:var(--rsm);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
@@ -425,12 +425,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .alloc-pct{font-size:13px;font-weight:600;color:var(--text2);width:36px;text-align:right;}
 .alloc-yield{font-size:13px;font-weight:700;color:var(--green);width:48px;text-align:right;}
 input[type=range]{accent-color:var(--accent);}
- 
+
 /* NOTA */
 .nota{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rsm);padding:14px;}
 .nota textarea{width:100%;background:transparent;border:none;color:var(--text2);font-size:13px;font-family:var(--sans);resize:none;min-height:80px;line-height:1.6;}
 .nota textarea:focus{outline:none;color:var(--text);}
- 
+
 /* MARCO */
 .th-block{background:var(--white);border-radius:var(--r);padding:24px;box-shadow:var(--shadow);margin-bottom:14px;}
 .th-h{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
@@ -441,7 +441,7 @@ input[type=range]{accent-color:var(--accent);}
 .sell-blk{background:var(--red-light);border-left:3px solid var(--red);border-radius:0 var(--rsm) var(--rsm) 0;padding:12px 16px;margin-bottom:8px;}
 .sell-blk-title{font-size:13px;font-weight:700;color:var(--red);margin-bottom:3px;}
 .sell-blk-desc{font-size:12px;color:var(--text2);line-height:1.5;}
- 
+
 /* SIMULADOR */
 .sim-toggle{display:flex;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:24px;width:fit-content;}
 .sim-btn{padding:9px 22px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text3);font-family:var(--sans);transition:all .2s;}
@@ -460,7 +460,7 @@ input[type=range]{accent-color:var(--accent);}
 .hito{background:var(--white);border-radius:var(--rsm);padding:14px;text-align:center;box-shadow:var(--shadow);}
 .hito-val{font-size:18px;font-weight:800;color:var(--accent);}
 .hito-lbl{font-size:11px;color:var(--text3);margin-top:4px;}
- 
+
 /* MODAL */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(13,17,23,.5);z-index:500;align-items:center;justify-content:center;}
 .modal-ov.open{display:flex;}
@@ -468,7 +468,7 @@ input[type=range]{accent-color:var(--accent);}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:6px;}
 .modal-sub{font-size:13px;color:var(--text3);margin-bottom:20px;line-height:1.5;}
 .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
- 
+
 /* UTILS */
 .pos{color:var(--green);}
 .neg{color:var(--red);}
@@ -477,7 +477,7 @@ input[type=range]{accent-color:var(--accent);}
 </style>
 </head>
 <body>
- 
+
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-card">
@@ -493,10 +493,10 @@ input[type=range]{accent-color:var(--accent);}
     <div style="font-size:11px;color:#b0b8c9;margin-top:16px;">Tus datos se guardan de forma segura en Firebase · Google</div>
   </div>
 </div>
- 
+
 <!-- APP SCREEN -->
 <div id="app-screen">
- 
+
 <!-- SIDEBAR -->
 <nav class="sidebar">
   <div class="logo-mark">FX</div>
@@ -511,9 +511,9 @@ input[type=range]{accent-color:var(--accent);}
   <button class="nav-btn" onclick="doLogout()" style="margin-top:4px;">🚪<span class="nav-tt">Cerrar sesión</span></button>
   <button class="nav-btn" onclick="setupBiometrics()" style="margin-top:4px;">🔐<span class="nav-tt">Activar Face ID</span></button>
 </nav>
- 
+
 <main class="main">
- 
+
 <!-- ══ DASHBOARD ══ -->
 <div id="section-dashboard" class="section active">
   <div class="ph">
@@ -523,7 +523,7 @@ input[type=range]{accent-color:var(--accent);}
       <button class="btn btn-dark" onclick="openModal('modal-aportacion')">+ Depositar</button>
     </div>
   </div>
- 
+
   <!-- HERO -->
   <div class="hero">
     <div style="display:flex;align-items:flex-end;gap:8px;">
@@ -531,14 +531,14 @@ input[type=range]{accent-color:var(--accent);}
       <div class="hero-cur">MXN</div>
     </div>
     <div style="margin-top:6px;font-size:13px;color:var(--text3);" id="dash-delta">Sin posiciones activas</div>
- 
+
     <div class="rend-grid">
       <div class="rend-chip"><div class="rend-lbl">Rendimiento hoy</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
       <div class="rend-chip"><div class="rend-lbl">Rendimiento del mes</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
       <div class="rend-chip"><div class="rend-lbl">Rendimiento del año</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
       <div class="rend-chip"><div class="rend-lbl">Rendimiento histórico</div><div class="rend-val neu">→ $0.00</div><div class="rend-pct neu">0.00%</div></div>
     </div>
- 
+
     <div class="chart-wrap">
       <svg width="100%" height="100%" viewBox="0 0 800 140" preserveAspectRatio="none">
         <defs>
@@ -559,7 +559,7 @@ input[type=range]{accent-color:var(--accent);}
       <button class="ctab">Todo</button>
     </div>
   </div>
- 
+
   <!-- DISPONIBLE -->
   <div class="disp-bar">
     <div>
@@ -568,10 +568,10 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <button class="btn btn-dark" onclick="openModal('modal-aportacion')">+ Comprar</button>
   </div>
- 
+
   <!-- MI PORTAFOLIO -->
   <div class="sec-h">Mi portafolio <span class="sec-h-sub" id="dash-yield-label">—</span></div>
- 
+
   <!-- PORTAFOLIO + DONAS -->
   <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;margin-bottom:16px;">
     <div class="pos-list" id="position-list" style="margin-bottom:0;">
@@ -581,7 +581,7 @@ input[type=range]{accent-color:var(--accent);}
         <div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div>
       </div>
     </div>
- 
+
     <!-- DONAS -->
     <div style="display:flex;flex-direction:column;gap:12px;">
       <!-- Dona por FIBRA -->
@@ -602,7 +602,7 @@ input[type=range]{accent-color:var(--accent);}
       </div>
     </div>
   </div>
- 
+
   <!-- SUBTABS -->
   <div class="subtabs">
     <button class="stab active" onclick="showStab('ordenes',this)">Órdenes</button>
@@ -610,7 +610,7 @@ input[type=range]{accent-color:var(--accent);}
     <button class="stab" onclick="showStab('dividendos',this)">Dividendos</button>
     <button class="stab" onclick="showStab('movimientos',this)">Movimientos</button>
   </div>
- 
+
   <div id="stab-ordenes" class="stab-content active">
     <div class="card"><div class="empty-pos"><div class="empty-ico">📋</div><div class="empty-title">Aún no has realizado órdenes</div></div></div>
   </div>
@@ -648,13 +648,13 @@ input[type=range]{accent-color:var(--accent);}
     <div class="card" id="hist-movs"><div class="empty-pos"><div class="empty-ico">📊</div><div class="empty-title">Sin movimientos</div></div></div>
   </div>
 </div>
- 
+
 <!-- ══ SCREENING ══ -->
 <div id="section-screening" class="section">
   <div class="ph">
     <div><div class="ph-title">Screening de FIBRAs</div><div class="ph-sub">16 FIBRAs · ordenadas por criterios cumplidos · <span id="screening-update-date">cargando...</span></div></div>
   </div>
- 
+
   <!-- Leyenda criterios -->
   <div style="display:flex;gap:20px;align-items:center;margin-bottom:16px;padding:12px 16px;background:var(--white);border-radius:var(--rsm);box-shadow:var(--shadow);font-size:12px;color:var(--text2);">
     <span style="font-weight:600;color:var(--text);">Criterios:</span>
@@ -669,10 +669,10 @@ input[type=range]{accent-color:var(--accent);}
       <span><span style="color:var(--red);">●</span> No cumple</span>
     </span>
   </div>
- 
+
   <!-- SCORE 5/5 — COMPRAR -->
   <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px;padding:4px 8px;background:var(--green-light);border-radius:5px;display:inline-block;">✓ Cumplen todos los criterios</div>
- 
+
   <div class="fibra-card" onclick="toggleChart('FUNO11')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-div">FUNO<br>11</div>
@@ -684,7 +684,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FUNO11"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('DANHOS13')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-com">DAN<br>HOS</div>
@@ -696,7 +696,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-DANHOS13"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('EDUCA18')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fef3c7;color:#92400e;">EDU<br>CA</div>
@@ -708,7 +708,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-EDUCA18"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('NEXT25')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-ind">NXT<br>25</div>
@@ -720,10 +720,10 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-NEXT25"></div>
   </div>
- 
+
   <!-- SCORE 4/5 — OBSERVAR -->
   <div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--yellow-light);border-radius:5px;display:inline-block;">⚠ Con observaciones (4/5)</div>
- 
+
   <div class="fibra-card" onclick="toggleChart('FMTY14')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-ind">FMTY<br>14</div>
@@ -735,7 +735,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FMTY14"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('FSHOP13')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fff7ed;color:#c2410c;">FSH<br>OP</div>
@@ -747,7 +747,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FSHOP13"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('FNOVA17')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-ind">FNO<br>VA</div>
@@ -759,7 +759,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FNOVA17"></div>
   </div>
- 
+
   <div class="fibra-card" onclick="toggleChart('FPLUS16')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-div">FPL<br>US</div>
@@ -771,10 +771,10 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FPLUS16"></div>
   </div>
- 
+
   <!-- SCORE 3/5 o menos — NO CUMPLE -->
   <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding:4px 8px;background:var(--red-light);border-radius:5px;display:inline-block;">✗ No cumplen criterios clave</div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FIBRAPL14')">
     <div class="fibra-card-row">
       <div class="fibra-ico ico-ind">PL<br>14</div>
@@ -786,7 +786,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FIBRAPL14"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('TERRA13')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#f3f0ff;color:#6c40d9;">TER<br>RA</div>
@@ -798,7 +798,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-TERRA13"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FHIPO14')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#e0f2fe;color:#0369a1;">FHI<br>PO</div>
@@ -810,7 +810,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FHIPO14"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('STORAGE18')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#f0fdf4;color:#166534;">STO<br>RE</div>
@@ -822,7 +822,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-STORAGE18"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FMX23')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fdf4ff;color:#7e22ce;">FMX<br>23</div>
@@ -834,7 +834,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FMX23"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FCFE18')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fff1f2;color:#be123c;">FCFE<br>18</div>
@@ -846,7 +846,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FCFE18"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FINN13')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FINN<br>13</div>
@@ -858,7 +858,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FINN13"></div>
   </div>
- 
+
   <div class="fibra-card" style="opacity:.65;" onclick="toggleChart('FIHO12')">
     <div class="fibra-card-row">
       <div class="fibra-ico" style="background:#fef9c3;color:#854d0e;">FIH<br>O</div>
@@ -870,9 +870,9 @@ input[type=range]{accent-color:var(--accent);}
     </div>
     <div class="fibra-chart-panel" id="chart-FIHO12"></div>
   </div>
- 
+
   <div class="divider"></div>
- 
+
   <!-- PROPUESTA -->
   <div class="prop-card">
     <div class="sec-h" style="margin-bottom:16px;">Portafolio sugerido</div>
@@ -884,7 +884,7 @@ input[type=range]{accent-color:var(--accent);}
       </div>
       <button class="btn btn-accent" onclick="confirmarPortafolio()">Confirmar →</button>
     </div>
- 
+
     <!-- FILAS DINÁMICAS -->
     <div id="alloc-rows">
       <div class="alloc-row" id="row-FUNO11">
@@ -916,7 +916,7 @@ input[type=range]{accent-color:var(--accent);}
         <button onclick="removeFibraAlloc('FSHOP13')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;" title="Quitar">×</button>
       </div>
     </div>
- 
+
     <!-- AGREGAR FIBRA -->
     <div style="display:flex;gap:10px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
       <select id="add-fibra-select" style="flex:1;">
@@ -941,30 +941,30 @@ input[type=range]{accent-color:var(--accent);}
       </select>
       <button class="btn btn-outline" onclick="addFibraAlloc()" style="white-space:nowrap;">＋ Agregar</button>
     </div>
- 
+
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:12px 16px;background:var(--bg);border-radius:var(--rsm);">
       <span style="font-size:13px;color:var(--text3);">Suma: <strong id="scr-suma" style="color:var(--green);">100%</strong></span>
       <span style="font-size:13px;color:var(--text3);">Yield ponderado: <strong id="scr-yield" style="color:var(--accent);">7.37%</strong></span>
     </div>
   </div>
- 
+
   <div class="prop-card">
     <div class="sec-h" style="margin-bottom:12px;">Bitácora</div>
     <div class="nota"><textarea placeholder="Escribe el razonamiento de tus decisiones de este mes..."></textarea></div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px;"><button class="btn btn-outline">Guardar nota</button></div>
   </div>
 </div>
- 
+
 <!-- ══ MARCO TEÓRICO ══ -->
 <div id="section-marco" class="section">
   <div class="ph"><div><div class="ph-title">Marco Teórico</div><div class="ph-sub">Fundamentos, metodología y reglas del sistema</div></div></div>
- 
+
   <div class="th-block">
     <div class="th-h">◈ <span class="th-accent">Filosofía base</span></div>
     <p style="font-size:13px;color:var(--text2);line-height:1.7;">Basado en Brinson, Hood & Beebower (1986): el <strong style="color:var(--accent);">91.5% del rendimiento</strong> de un portafolio proviene de la distribución de activos, no de la selección individual. Cuánto tienes en cada FIBRA importa más que cuál tienes.</p>
     <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-top:10px;">Objetivo: portafolio con <strong style="color:var(--green);">yield entre 5% y 9%</strong> más crecimiento por apreciación. El dividendo es flujo real y comprobable — el NAV es margen de seguridad, no garantía de precio futuro.</p>
   </div>
- 
+
   <div class="th-block">
     <div class="th-h">✓ <span class="th-accent">Criterios de entrada</span> — todos deben cumplirse</div>
     <div class="rule-item"><span class="rule-num">01</span><div><strong>Yield entre 5% y 9%</strong> — por debajo no compensa vs renta fija; por encima puede señalar distress financiero.</div></div>
@@ -973,7 +973,7 @@ input[type=range]{accent-color:var(--accent);}
     <div class="rule-item"><span class="rule-num">04</span><div><strong>LTV menor al 40%</strong> — apalancamiento conservador. En ciclos de tasas altas, la deuda excesiva comprime el AFFO.</div></div>
     <div class="rule-item"><span class="rule-num">05</span><div><strong>AFFO cubre 100% del dividendo</strong> — el payout ratio no debe exceder el flujo de caja ajustado.</div></div>
   </div>
- 
+
   <div class="th-block">
     <div class="th-h">⚠ <span style="color:var(--red);">Señales de venta</span> — cualquiera activa salida</div>
     <div class="sell-blk"><div class="sell-blk-title">Premio sobre NAV mayor a +10%</div><div class="sell-blk-desc">Margen de seguridad desapareció. El mercado paga más de lo que valen los activos. (Green Street Advisors)</div></div>
@@ -981,7 +981,7 @@ input[type=range]{accent-color:var(--accent);}
     <div class="sell-blk"><div class="sell-blk-title">Ocupación cae bajo 88% por 2 trimestres consecutivos</div><div class="sell-blk-desc">Deterioro estructural del portafolio de propiedades, no estacionalidad.</div></div>
     <div class="sell-blk" style="margin-bottom:0;"><div class="sell-blk-title">LTV supera 40%</div><div class="sell-blk-desc">Apalancamiento excesivo comprime el AFFO y eleva el riesgo de impago.</div></div>
   </div>
- 
+
   <div class="th-block">
     <div class="th-h">◧ <span class="th-accent">Distribución del portafolio</span></div>
     <div class="rule-item"><span class="rule-num">1°</span><div><strong>Yield actual</strong> — mayor yield dentro del rango 5–9% recibe mayor peso. Es el flujo real y garantizable.</div></div>
@@ -990,28 +990,28 @@ input[type=range]{accent-color:var(--accent);}
     <div class="rule-item" style="border:none;"><span class="rule-num">Meta</span><div>Industrial 50% · Comercial 30% · Diversificado 20% · Oficinas 0%.</div></div>
   </div>
 </div>
- 
+
 <!-- ══ SIMULADOR ══ -->
 <div id="section-simulador" class="section">
   <div class="ph"><div><div class="ph-title">Simulador de Crecimiento</div><div class="ph-sub">Proyecta tu portafolio en el tiempo</div></div></div>
- 
+
   <div class="card">
     <div class="sim-toggle">
       <button class="sim-btn active" id="btn-reinv" onclick="setModo('reinv')">↺ Reinvertir dividendos</button>
       <button class="sim-btn" id="btn-ret" onclick="setModo('ret')">↓ Retirar dividendos</button>
     </div>
- 
+
     <div id="modo-desc" style="padding:10px 14px;background:var(--accent-light);border-left:3px solid var(--accent);border-radius:0 var(--rsm) var(--rsm) 0;font-size:12px;color:var(--text2);margin-bottom:24px;line-height:1.6;">
       <strong>Reinversión total:</strong> Cada dividendo se suma al capital y genera más dividendos. Máximo interés compuesto — ideal para fase de acumulación.
     </div>
- 
+
     <div class="sim-grid">
       <div><label class="fl">Capital inicial (MXN)</label><input type="number" id="sim-ini" value="0" min="0" oninput="calcSim()" placeholder="0"></div>
       <div><label class="fl">Aportación mensual</label><input type="number" id="sim-men" value="1000" min="0" oninput="calcSim()"></div>
       <div><label class="fl">Años de inversión</label><input type="number" id="sim-anos" value="10" min="1" max="40" oninput="calcSim()"></div>
       <div><label class="fl">Yield anual (%)</label><input type="number" id="sim-yield" value="7.37" min="1" max="20" step="0.1" oninput="calcSim()"></div>
     </div>
- 
+
     <div class="sim-out">
       <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:16px;">Proyección al final del período</div>
       <div class="sim-results">
@@ -1026,16 +1026,16 @@ input[type=range]{accent-color:var(--accent);}
         <div class="sim-bdi"><div class="sim-bdv" style="color:var(--green);" id="sv-dac">$0</div><div class="sim-bdl">Dividendos acumulados</div></div>
       </div>
     </div>
- 
+
     <div style="font-size:13px;font-weight:600;margin:20px 0 12px;">¿En cuántos años llegas a esta renta mensual?</div>
     <div class="hitos" id="sim-hitos"></div>
     <div style="margin-top:16px;font-size:11px;color:var(--text3);line-height:1.6;">* Asume yield constante y aportaciones al inicio de cada mes. No considera inflación ni impuestos. Solo informativo.</div>
   </div>
 </div>
- 
+
 </main>
 </div><!-- /app-screen -->
- 
+
 <!-- MODAL COMPRA -->
 <div class="modal-ov" id="modal-aportacion">
   <div class="modal">
@@ -1081,7 +1081,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
   </div>
 </div>
- 
+
 <!-- MODAL VENTA -->
 <div class="modal-ov" id="modal-venta">
   <div class="modal">
@@ -1106,7 +1106,7 @@ input[type=range]{accent-color:var(--accent);}
     </div>
   </div>
 </div>
- 
+
 <!-- MODAL DIVIDENDO -->
 <div class="modal-ov" id="modal-dividendo">
   <div class="modal">
@@ -1162,24 +1162,24 @@ input[type=range]{accent-color:var(--accent);}
     </div>
   </div>
 </div>
- 
+
 <!-- MODAL ACTUALIZAR -->
 <div class="modal-ov" id="modal-update">
   <div class="modal" style="width:580px;">
     <div class="modal-title">⟳ Actualizar datos de FIBRAs</div>
     <div class="modal-sub">Copia el prompt de abajo y pégalo en Claude. Te dará un JSON. Pégalo aquí y click Aplicar — las tarjetas del screening se actualizan solas.</div>
- 
+
     <!-- PROMPT COPIABLE -->
     <div style="position:relative;margin-bottom:16px;">
-      <div style="background:var(--bg);border-radius:var(--rsm);padding:12px 14px;font-size:11px;color:var(--text2);line-height:1.8;font-family:monospace;user-select:all;cursor:text;border:1px solid var(--border);" id="update-prompt">Busca en ingresopasivo.mx/fibras y en los reportes trimestrales más recientes de cada FIBRA los siguientes datos actualizados para FUNO11, FMTY14, DANHOS13, FSHOP13, EDUCA18, NEXT25, FNOVA17, FPLUS16, FIBRAPL14, TERRA13, FHIPO14, STORAGE18, FMX23, FINN13, FIHO12: precio actual (Yahoo Finance o Google Finance .MX), NAV/CBFI, descuento o premio vs NAV en %, yield anualizado en %, ocupación en %, LTV en %, señal (comprar/observar/no_cumple). Devuelve ÚNICAMENTE un JSON con esta estructura exacta sin texto adicional: {"actualizado":"2026-06-29","fibras":[{"ticker":"FUNO11","precio":29.21,"nav":50.04,"descuento":-41.6,"yield":8.44,"ocupacion":95.7,"ltv":37.6,"señal":"comprar"}]}</div>
+      <div style="background:var(--bg);border-radius:var(--rsm);padding:12px 14px;font-size:11px;color:var(--text2);line-height:1.8;font-family:monospace;user-select:all;cursor:text;border:1px solid var(--border);" id="update-prompt">Obtén los datos más recientes de cada FIBRA desde sus páginas oficiales de relaciones con inversionistas (último reporte trimestral publicado): FUNO11 en funo.mx, FMTY14 en fibramty.com, DANHOS13 en danhos.com.mx, FSHOP13 en fibrashop.mx, EDUCA18 en fibraeduca.com, NEXT25 en fibranext.com, FNOVA17 en fibranovanl.com, FPLUS16 en fibraplus.com.mx, FIBRAPL14 en fibraprologis.com, TERRA13 en terrafina.mx, FHIPO14 en fhipo.com, STORAGE18 en fibrastorage.com.mx, FMX23 en fibramx.com, FINN13 en fibrainn.com, FIHO12 en fibrahotel.com. Para el precio actual usa Yahoo Finance o Google Finance con el ticker .MX. Extrae para cada una: precio actual, NAV/CBFI, descuento o premio vs NAV en %, yield anualizado en %, ocupación en %, LTV en %, señal (comprar/observar/no_cumple) según estos criterios: comprar=yield 5-9% + descuento NAV + ocupacion&gt;90% + LTV&lt;40%, observar=cumple 4/5 criterios, no_cumple=falla criterio clave. Devuelve ÚNICAMENTE un JSON sin texto adicional: {"actualizado":"2026-06-30","fibras":[{"ticker":"FUNO11","precio":29.97,"nav":50.04,"descuento":-40.1,"yield":8.22,"ocupacion":95.7,"ltv":37.6,"señal":"comprar"}]}</div>
       <button onclick="copyPrompt()" class="btn btn-outline" style="margin-top:8px;font-size:11px;padding:6px 12px;">📋 Copiar prompt</button>
     </div>
- 
+
     <div class="fg">
       <label class="fl">Pega aquí la respuesta de Claude (JSON)</label>
       <textarea id="update-input" style="min-height:120px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='{"actualizado":"2026-06-29","fibras":[...]}'></textarea>
     </div>
- 
+
     <!-- PREVIEW -->
     <div id="update-preview" style="display:none;background:var(--green-light);border-radius:var(--rsm);padding:10px 14px;font-size:12px;color:var(--green);margin-bottom:12px;">
       ✓ JSON válido — <span id="update-preview-count"></span> FIBRAs listas para actualizar
@@ -1187,14 +1187,14 @@ input[type=range]{accent-color:var(--accent);}
     <div id="update-error" style="display:none;background:var(--red-light);border-radius:var(--rsm);padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;">
       ✗ JSON inválido — verifica que copiaste toda la respuesta de Claude
     </div>
- 
+
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-update')">Cancelar</button>
       <button class="btn btn-accent" onclick="applyUpdate()">Aplicar actualización</button>
     </div>
   </div>
 </div>
- 
+
 <script>
 // ── NAVIGATION ──
 function showSection(id, btn) {
@@ -1203,47 +1203,47 @@ function showSection(id, btn) {
   document.getElementById('section-' + id).classList.add('active');
   if (btn) btn.classList.add('active');
 }
- 
+
 function showStab(id, btn) {
   document.querySelectorAll('.stab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.stab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('stab-' + id).classList.add('active');
   btn.classList.add('active');
 }
- 
+
 // ── MODALS ──
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-ov').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
- 
+
 // ── CHART TABS ──
 document.querySelectorAll('.ctab').forEach(t => t.addEventListener('click', function(){
   document.querySelectorAll('.ctab').forEach(x => x.classList.remove('active'));
   this.classList.add('active');
 }));
- 
+
 // ── DATA ──
 window.compras = window.compras || [];
 window.ventas = window.ventas || [];
 window.dividendos = window.dividendos || [];
 window.livePrices = window.livePrices || {};
- 
+
 const staticPrices = {
   FUNO11:29.21, FMTY14:13.78, DANHOS13:28.03, FSHOP13:11.50,
   FIBRAPL14:76.74, FNOVA17:41.48, NEXT25:28.50, EDUCA18:35.20,
   TERRA13:42.10, FHIPO14:18.30, STORAGE18:25.40, FMX23:12.20,
   FCFE18:30.00, FINN13:4.95, FIHO12:8.60, FPLUS16:1.80
 };
- 
+
 const FIBRA_SECTOR_MAP = {
   FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
   EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
   FIBRAPL14:'Industrial', TERRA13:'Industrial', FHIPO14:'Hipotecario', STORAGE18:'Almacenaje',
   FMX23:'Infraestructura', FINN13:'Hotelero', FIHO12:'Hotelero', FCFE18:'Energía'
 };
- 
+
 function getPrice(t) { return window.livePrices[t] || staticPrices[t] || 0; }
- 
+
 // ── COMPRAS ──
 function registrarCompra() {
   const fecha = document.getElementById('ap-fecha').value;
@@ -1259,7 +1259,7 @@ function registrarCompra() {
   renderPosiciones();
   closeModal('modal-aportacion');
 }
- 
+
 // ── VENTAS ──
 function registrarVenta() {
   const fibra = document.getElementById('vt-fibra').value;
@@ -1274,7 +1274,7 @@ function registrarVenta() {
   renderPosiciones();
   closeModal('modal-venta');
 }
- 
+
 // ── HISTORIAL ──
 function renderHistorial() {
   const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
@@ -1297,7 +1297,7 @@ function renderHistorial() {
     <div class="hist-item"><div class="hist-dot hd-sell">📤</div><div class="hist-info"><div class="hist-title">Total retirado</div></div><div class="hist-amt neg">${fmt(v.reduce((a,b)=>a+b.total,0))}</div></div>
   </div>`;
 }
- 
+
 // ── POSICIONES ──
 function renderPosiciones() {
   const pos = {};
@@ -1349,11 +1349,11 @@ function renderPosiciones() {
   if(yl) yl.textContent=`${activPos.length} posiciones`;
   renderPieCharts();
 }
- 
+
 // ── PIE CHARTS ──
 const PIE_COLORS=['#1a56db','#0e9f6e','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
 const SECTOR_COLORS={'Industrial':'#1a56db','Comercial':'#8b5cf6','Diversificado':'#0e9f6e','Hotelero':'#f59e0b','Educativo':'#06b6d4','Hipotecario':'#ec4899','Almacenaje':'#84cc16','Infraestructura':'#64748b','Energía':'#ef4444'};
- 
+
 function drawPie(canvasId,data,colors) {
   const canvas=document.getElementById(canvasId); if(!canvas) return;
   const ctx=canvas.getContext('2d');
@@ -1369,7 +1369,7 @@ function drawPie(canvasId,data,colors) {
   });
   ctx.beginPath();ctx.arc(cx,cy,ir,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
 }
- 
+
 function renderPieCharts() {
   const pos={};
   (window.compras||[]).forEach(c=>{if(!pos[c.fibra])pos[c.fibra]=0;pos[c.fibra]+=c.monto;});
@@ -1389,7 +1389,7 @@ function renderPieCharts() {
   const l2=document.getElementById('pie-sector-legend');
   if(l2){const tot=sd.reduce((a,b)=>a+b.value,0);l2.innerHTML=sd.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;"><div style="width:8px;height:8px;border-radius:50%;background:${sc[i]};flex-shrink:0;"></div><span>${d.label} <strong>${((d.value/tot)*100).toFixed(1)}%</strong></span></div>`).join('');}
 }
- 
+
 // ── DIVIDENDOS ──
 function calcDividendo() {
   const cbfis=parseFloat(document.getElementById('dv-cbfis').value)||0;
@@ -1402,7 +1402,7 @@ function calcDividendo() {
   document.getElementById('dv-preview-isr').textContent=fmt(isr);
   document.getElementById('dv-preview-neto').textContent=fmt(total-isr);
 }
- 
+
 function registrarDividendo() {
   const fibra=document.getElementById('dv-fibra').value;
   const fecha=document.getElementById('dv-fecha').value;
@@ -1418,7 +1418,7 @@ function registrarDividendo() {
   renderDividendos();
   closeModal('modal-dividendo');
 }
- 
+
 function renderDividendos() {
   const divs=window.dividendos||[];
   const fmt=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
@@ -1437,11 +1437,11 @@ function renderDividendos() {
   });
   hist.innerHTML=html+'</div>';
 }
- 
+
 // ── ALLOC ──
 const FIBRA_YIELDS={FUNO11:8.44,FMTY14:7.75,DANHOS13:6.42,FSHOP13:6.11,EDUCA18:7.20,NEXT25:6.80,FNOVA17:5.90,FPLUS16:5.50,FIBRAPL14:3.79,TERRA13:4.50,FHIPO14:4.10,STORAGE18:9.50,FMX23:3.50,FINN13:7.27,FIHO12:4.80,FCFE18:0};
 let allocFibras=['FUNO11','FMTY14','DANHOS13','FSHOP13'];
- 
+
 function updateAlloc() {
   let suma=0,yp=0;
   allocFibras.forEach(t=>{
@@ -1456,7 +1456,7 @@ function updateAlloc() {
   if(sb)sb.textContent=yp.toFixed(2)+'%';
   if(rm)rm.textContent='~$'+Math.round(10000*yp/100/12)+'/mes';
 }
- 
+
 function addFibraAlloc() {
   const sel=document.getElementById('add-fibra-select'); if(!sel.value) return;
   const [ticker,yld]=sel.value.split('|');
@@ -1470,20 +1470,20 @@ function addFibraAlloc() {
   container.appendChild(div);
   sel.value='';updateAlloc();
 }
- 
+
 function removeFibraAlloc(ticker) {
   if(allocFibras.length<=2){alert('Mínimo 2 FIBRAs.');return;}
   allocFibras=allocFibras.filter(t=>t!==ticker);
   const row=document.getElementById('row-'+ticker); if(row) row.remove();
   updateAlloc();
 }
- 
+
 function confirmarPortafolio() {
   alert('✓ Portafolio confirmado. Ve al Dashboard para registrar tu primera compra.');
   showSection('dashboard',document.querySelectorAll('.nav-btn')[0]);
   document.querySelectorAll('.nav-btn')[0].classList.add('active');
 }
- 
+
 // ── CHARTS ──
 let openChart=null;
 const PERF_DATA={
@@ -1504,7 +1504,7 @@ const PERF_DATA={
   FPLUS16:{d:'0.00%',m:'+0.5%',ytd:'+2.0%',a:'+3.0%'},
   FCFE18:{d:'0.00%',m:'0.00%',ytd:'N/D',a:'N/D'}
 };
- 
+
 function toggleChart(ticker) {
   if(event) event.stopPropagation();
   const panel=document.getElementById('chart-'+ticker); if(!panel) return;
@@ -1527,7 +1527,7 @@ function toggleChart(ticker) {
     <div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:right;">${chartCache[ticker]?'⚡ Caché':'🔄 Alpha Vantage'} · BMV</div>`;
   fetchChartData(ticker).then(data=>drawChart(ticker,data));
 }
- 
+
 function drawChart(ticker,data) {
   const container=document.getElementById('chart-svg-'+ticker); if(!container) return;
   if(!data||data.length===0){container.innerHTML='<div style="font-size:12px;color:var(--text3);text-align:center;padding:20px;">Sin datos · límite de API o ticker no disponible</div>';return;}
@@ -1561,7 +1561,7 @@ function drawChart(ticker,data) {
   svg+='</svg>';
   container.innerHTML=svg;
 }
- 
+
 // ── BIOMETRÍA ──
 async function setupBiometrics() {
   if(!window.PublicKeyCredential){alert('Tu dispositivo no soporta biometría.');return;}
@@ -1579,13 +1579,13 @@ async function setupBiometrics() {
     if(cred){localStorage.setItem('fbx_biometric','enabled');alert('✓ Face ID / Touch ID configurado.');}
   } catch(e){if(e.name!=='NotAllowedError')alert('Error: '+e.message);}
 }
- 
+
 // ── ACTUALIZAR DATOS ──
 function copyPrompt() {
   const txt=document.getElementById('update-prompt').textContent;
   navigator.clipboard.writeText(txt).then(()=>alert('✓ Prompt copiado. Pégalo en Claude.'));
 }
- 
+
 document.getElementById('update-input').addEventListener('input',()=>{
   const raw=document.getElementById('update-input').value.trim();
   const prev=document.getElementById('update-preview');
@@ -1599,7 +1599,7 @@ document.getElementById('update-input').addEventListener('input',()=>{
     }else throw new Error();
   }catch(e){if(prev)prev.style.display='none';if(err)err.style.display='block';}
 });
- 
+
 function applyUpdate() {
   const raw=document.getElementById('update-input').value.trim();
   if(!raw) return alert('Pega la respuesta de Claude primero.');
@@ -1616,7 +1616,7 @@ function applyUpdate() {
   document.getElementById('update-input').value='';
   alert('✓ '+data.fibras.length+' FIBRAs actualizadas.');
 }
- 
+
 function applyScreeningData(data) {
   data.fibras.forEach(f=>{
     const card=document.querySelector(`[onclick="toggleChart('${f.ticker}')"]`);
@@ -1647,7 +1647,7 @@ function applyScreeningData(data) {
   });
   updateAlloc();
 }
- 
+
 function loadSavedScreeningData() {
   const saved=localStorage.getItem('fbx_screening_data');
   const el=document.getElementById('screening-update-date');
@@ -1659,7 +1659,7 @@ function loadSavedScreeningData() {
     }catch(e){}
   }else{if(el)el.textContent='datos 1T26 · presiona ⟳ para actualizar';}
 }
- 
+
 // ── SIMULADOR ──
 let modo='reinv';
 function setModo(m) {
@@ -1680,7 +1680,7 @@ function setModo(m) {
   }
   calcSim();
 }
- 
+
 function calcSim() {
   const ini=parseFloat(document.getElementById('sim-ini').value)||0;
   const men=parseFloat(document.getElementById('sim-men').value)||0;
@@ -1712,7 +1712,7 @@ function calcSim() {
   });
   const sh=document.getElementById('sim-hitos');if(sh)sh.innerHTML=h;
 }
- 
+
 // ── INIT ──
 updateAlloc();
 setModo('reinv');
@@ -1720,4 +1720,3 @@ loadSavedScreeningData();
 </script>
 </body>
 </html>
- 
