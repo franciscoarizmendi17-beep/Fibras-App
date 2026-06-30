@@ -1153,7 +1153,7 @@ input[type=range]{accent-color:var(--accent);}
 </div>
 
 <script>
-// NAV
+// ── NAVIGATION ──
 function showSection(id, btn) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -1161,7 +1161,6 @@ function showSection(id, btn) {
   if (btn) btn.classList.add('active');
 }
 
-// SUBTABS
 function showStab(id, btn) {
   document.querySelectorAll('.stab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.stab-content').forEach(c => c.classList.remove('active'));
@@ -1169,105 +1168,40 @@ function showStab(id, btn) {
   btn.classList.add('active');
 }
 
-// MODALS
+// ── MODALS ──
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-ov').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
 
-// CHART TABS
-document.querySelectorAll('.ctab').forEach(t => t.addEventListener('click', function(){ document.querySelectorAll('.ctab').forEach(x=>x.classList.remove('active')); this.classList.add('active'); }));
+// ── CHART TABS ──
+document.querySelectorAll('.ctab').forEach(t => t.addEventListener('click', function(){
+  document.querySelectorAll('.ctab').forEach(x => x.classList.remove('active'));
+  this.classList.add('active');
+}));
 
-// DATA (populated from Firebase on login)
+// ── DATA ──
 window.compras = window.compras || [];
 window.ventas = window.ventas || [];
 window.dividendos = window.dividendos || [];
 window.livePrices = window.livePrices || {};
 
-// STATIC PRICE FALLBACK (last known prices 1T26)
 const staticPrices = {
-  FUNO11: 29.21, FMTY14: 13.78, DANHOS13: 28.03,
-  FSHOP13: 11.50, FIBRAPL14: 76.74, FNOVA17: 41.48,
-  NEXT25: 28.50, EDUCA18: 35.20, TERRA13: 42.10,
-  FHIPO14: 18.30, STORAGE18: 25.40, FMX23: 12.20,
-  FCFE18: 30.00, FINN13: 4.95, FIHO12: 8.60, FPLUS16: 1.80
+  FUNO11:29.21, FMTY14:13.78, DANHOS13:28.03, FSHOP13:11.50,
+  FIBRAPL14:76.74, FNOVA17:41.48, NEXT25:28.50, EDUCA18:35.20,
+  TERRA13:42.10, FHIPO14:18.30, STORAGE18:25.40, FMX23:12.20,
+  FCFE18:30.00, FINN13:4.95, FIHO12:8.60, FPLUS16:1.80
 };
 
-function getPrice(ticker) {
-  return window.livePrices[ticker] || staticPrices[ticker] || 0;
-}
+const FIBRA_SECTOR_MAP = {
+  FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
+  EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
+  FIBRAPL14:'Industrial', TERRA13:'Industrial', FHIPO14:'Hipotecario', STORAGE18:'Almacenaje',
+  FMX23:'Infraestructura', FINN13:'Hotelero', FIHO12:'Hotelero', FCFE18:'Energía'
+};
 
-function renderPosiciones() {
-  // Group compras by fibra
-  const pos = {};
-  (window.compras || []).forEach(c => {
-    const t = c.fibra;
-    if (!pos[t]) pos[t] = { cbfis: 0, costo: 0, monto: 0 };
-    pos[t].cbfis += (c.cbfis || 0);
-    pos[t].monto += (c.monto || 0);
-    pos[t].costo += (c.cbfis || 0) * (c.precio || 0);
-  });
-  // Subtract ventas
-  (window.ventas || []).forEach(v => {
-    if (pos[v.fibra]) pos[v.fibra].cbfis -= (v.cbfis || 0);
-  });
+function getPrice(t) { return window.livePrices[t] || staticPrices[t] || 0; }
 
-  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
-  const totalInv = Object.values(pos).reduce((a,p) => a + p.monto, 0);
-
-  // Update hero value
-  let totalActual = 0;
-  Object.entries(pos).forEach(([t, p]) => {
-    if (p.cbfis > 0) totalActual += p.cbfis * getPrice(t);
-  });
-  document.getElementById('dash-valor').innerHTML = fmt(totalActual) + '<span style="font-size:16px;font-weight:400;"> MXN</span>';
-
-  const plNeto = totalActual - totalInv;
-  const plPct = totalInv > 0 ? ((plNeto/totalInv)*100).toFixed(2) : 0;
-  const deltaEl = document.getElementById('dash-delta');
-  if (totalInv > 0) {
-    deltaEl.innerHTML = `<span style="color:${plNeto>=0?'var(--green)':'var(--red)'};">${plNeto>=0?'+':''}${fmt(plNeto)} (${plPct}%) histórico</span>`;
-  } else {
-    deltaEl.textContent = 'Sin posiciones activas';
-  }
-
-  // Render position list
-  const list = document.getElementById('position-list');
-  const activPos = Object.entries(pos).filter(([t,p]) => p.cbfis > 0);
-  if (activPos.length === 0) {
-    list.innerHTML = '<div class="empty-pos"><div class="empty-ico">📂</div><div class="empty-title">Aquí verás tus instrumentos adquiridos</div><div class="empty-sub">Ve a Screening, confirma tu portafolio y registra tu primera compra</div></div>';
-    document.getElementById('dash-yield-label').textContent = '—';
-    return;
-  }
-
-  const sectorColors = {
-    FUNO11:'ico-div', DANHOS13:'ico-com', FMTY14:'ico-ind', FSHOP13:'',
-    FIBRAPL14:'ico-ind', FNOVA17:'ico-ind', NEXT25:'ico-ind', EDUCA18:''
-  };
-
-  let html = '';
-  activPos.forEach(([ticker, p]) => {
-    const precio = getPrice(ticker);
-    const valorActual = p.cbfis * precio;
-    const precioPromedio = p.cbfis > 0 ? p.costo / p.cbfis : 0;
-    const pl = valorActual - (precioPromedio * p.cbfis);
-    const plp = precioPromedio > 0 ? ((precio - precioPromedio)/precioPromedio*100).toFixed(2) : 0;
-    const cls = sectorColors[ticker] || 'ico-div';
-    html += `<div class="pos-row">
-      <div class="pos-ico ${cls}" style="${!cls?'background:#f5f7fa;color:#5a6478;':''}">${ticker.replace(/\d+/g,'')}<br><span style="font-size:8px;">${ticker.match(/\d+/)?.[0]||''}</span></div>
-      <div><div class="pos-name">${ticker}</div><div class="pos-sub">${p.cbfis.toFixed(0)} CBFIs · Precio entrada: ${fmt(precioPromedio)}</div></div>
-      <div class="pos-cbfis" style="font-size:11px;color:var(--text3);">Precio actual<br><strong style="color:var(--text);font-size:13px;" id="price-${ticker}">${fmt(precio)}</strong></div>
-      <div class="pos-val">${fmt(valorActual)}</div>
-      <div class="pos-rend" style="color:${pl>=0?'var(--green)':'var(--red)'};">${pl>=0?'+':''}${fmt(pl)}<br>${plp}%</div>
-    </div>`;
-  });
-  list.innerHTML = html;
-
-  // Update yield label
-  const yieldPond = 7.37; // TODO: calculate from portfolio
-  document.getElementById('dash-yield-label').textContent = `Yield ponderado ~${yieldPond}% · ${activPos.length} posiciones`;
-  renderPieCharts();
-}
-
+// ── COMPRAS ──
 function registrarCompra() {
   const fecha = document.getElementById('ap-fecha').value;
   const monto = parseFloat(document.getElementById('ap-monto').value);
@@ -1275,32 +1209,34 @@ function registrarCompra() {
   const precio = parseFloat(document.getElementById('ap-precio').value) || 0;
   const cbfis = parseFloat(document.getElementById('ap-cbfis').value) || 0;
   if (!fecha || !monto) return alert('Ingresa fecha y monto.');
-  const compra = { fecha, monto, fibra, precio, cbfis, ts: Date.now() };
-  window.compras.push(compra);
-  if (typeof saveCompra === 'function') saveCompra(compra);
+  const c = { fecha, monto, fibra, precio, cbfis, ts: Date.now() };
+  window.compras.push(c);
+  if (typeof saveCompra === 'function') saveCompra(c);
   renderHistorial();
   renderPosiciones();
   closeModal('modal-aportacion');
 }
 
+// ── VENTAS ──
 function registrarVenta() {
   const fibra = document.getElementById('vt-fibra').value;
   const cbfis = parseFloat(document.getElementById('vt-cbfis').value) || 0;
   const precio = parseFloat(document.getElementById('vt-precio').value) || 0;
   const fecha = document.getElementById('vt-fecha').value;
   if (!fecha || !cbfis || !precio) return alert('Completa todos los campos.');
-  const venta = { fecha, fibra, cbfis, precio, total: cbfis * precio, ts: Date.now() };
-  window.ventas.push(venta);
-  if (typeof saveVenta === 'function') saveVenta(venta);
+  const v = { fecha, fibra, cbfis, precio, total: cbfis*precio, ts: Date.now() };
+  window.ventas.push(v);
+  if (typeof saveVenta === 'function') saveVenta(v);
   renderHistorial();
   renderPosiciones();
   closeModal('modal-venta');
 }
 
+// ── HISTORIAL ──
 function renderHistorial() {
   const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
-  const c = window.compras || [], v = window.ventas || [];
-  const totalInv = c.reduce((a,b) => a+b.monto, 0);
+  const c = window.compras||[], v = window.ventas||[];
+  const totalInv = c.reduce((a,b)=>a+b.monto,0);
   let html = '<div style="padding:0 20px;">';
   [...c].reverse().forEach(x => {
     html += `<div class="hist-item"><div class="hist-dot hd-buy">🛒</div><div class="hist-info"><div class="hist-title">Compra · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt pos">+${fmt(x.monto)}</div></div>`;
@@ -1309,807 +1245,436 @@ function renderHistorial() {
     html += `<div class="hist-item"><div class="hist-dot hd-sell">💸</div><div class="hist-info"><div class="hist-title">Venta · ${x.fibra}</div><div class="hist-date">${x.fecha} · ${x.cbfis} CBFIs @ ${fmt(x.precio)}</div></div><div class="hist-amt neg">−${fmt(x.total)}</div></div>`;
   });
   html += '</div>';
-  if (c.length === 0 && v.length === 0) html = '<div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones</div></div>';
-  const el = document.getElementById('hist-trans');
-  if (el) el.innerHTML = html;
-  const mov = document.getElementById('hist-movs');
-  if (mov) mov.innerHTML = `<div style="padding:16px 20px;">
+  if (c.length===0 && v.length===0) html = '<div class="empty-pos"><div class="empty-ico">🔄</div><div class="empty-title">Sin transacciones</div></div>';
+  const et = document.getElementById('hist-trans');
+  if (et) et.innerHTML = html;
+  const em = document.getElementById('hist-movs');
+  if (em) em.innerHTML = `<div style="padding:16px 20px;">
     <div class="hist-item"><div class="hist-dot hd-buy">💼</div><div class="hist-info"><div class="hist-title">Total invertido</div><div class="hist-date">${c.length} aportaciones</div></div><div class="hist-amt pos">${fmt(totalInv)}</div></div>
     <div class="hist-item"><div class="hist-dot hd-sell">📤</div><div class="hist-info"><div class="hist-title">Total retirado</div></div><div class="hist-amt neg">${fmt(v.reduce((a,b)=>a+b.total,0))}</div></div>
   </div>`;
 }
 
-// ALLOC
-// ── ALLOC — Dynamic ──
-const FIBRA_YIELDS = {
-  FUNO11:8.44, FMTY14:7.75, DANHOS13:6.42, FSHOP13:6.11,
-  EDUCA18:7.20, NEXT25:6.80, FNOVA17:5.90, FPLUS16:5.50,
-  FIBRAPL14:3.79, TERRA13:4.50, FHIPO14:4.10, STORAGE18:9.50,
-  FMX23:3.50, FINN13:7.27, FIHO12:4.80, FCFE18:0
-};
+// ── POSICIONES ──
+function renderPosiciones() {
+  const pos = {};
+  (window.compras||[]).forEach(c => {
+    if (!pos[c.fibra]) pos[c.fibra]={cbfis:0,monto:0,costo:0};
+    pos[c.fibra].cbfis+=(c.cbfis||0);
+    pos[c.fibra].monto+=(c.monto||0);
+    pos[c.fibra].costo+=(c.cbfis||0)*(c.precio||0);
+  });
+  (window.ventas||[]).forEach(v => { if(pos[v.fibra]) pos[v.fibra].cbfis-=(v.cbfis||0); });
+  const fmt = n => '$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+  const totalInv = Object.values(pos).reduce((a,p)=>a+p.monto,0);
+  let totalActual = 0;
+  Object.entries(pos).forEach(([t,p])=>{ if(p.cbfis>0) totalActual+=p.cbfis*getPrice(t); });
+  const dv = document.getElementById('dash-valor');
+  if (dv) dv.innerHTML = fmt(totalActual)+'<span style="font-size:16px;font-weight:400;"> MXN</span>';
+  const pl = totalActual-totalInv;
+  const plp = totalInv>0?((pl/totalInv)*100).toFixed(2):0;
+  const de = document.getElementById('dash-delta');
+  if (de) {
+    if (totalInv>0) de.innerHTML=`<span style="color:${pl>=0?'var(--green)':'var(--red)'};">${pl>=0?'+':''}${fmt(pl)} (${plp}%) histórico</span>`;
+    else de.textContent='Sin posiciones activas';
+  }
+  const list = document.getElementById('position-list');
+  const activPos = Object.entries(pos).filter(([,p])=>p.cbfis>0);
+  if (!list) return;
+  if (activPos.length===0) {
+    list.innerHTML='<div class="empty-pos"><div class="empty-ico">📂</div><div class="empty-title">Aquí verás tus instrumentos adquiridos</div><div class="empty-sub">Ve a Screening y registra tu primera compra</div></div>';
+    const yl=document.getElementById('dash-yield-label'); if(yl) yl.textContent='—';
+    return;
+  }
+  const icoMap={FUNO11:'ico-div',DANHOS13:'ico-com',FMTY14:'ico-ind',FIBRAPL14:'ico-ind',FNOVA17:'ico-ind',NEXT25:'ico-ind'};
+  let html='';
+  activPos.forEach(([t,p])=>{
+    const precio=getPrice(t), va=p.cbfis*precio;
+    const pp=p.cbfis>0?p.costo/p.cbfis:0;
+    const plR=va-pp*p.cbfis, plpR=pp>0?((precio-pp)/pp*100).toFixed(2):0;
+    const cls=icoMap[t]||'ico-div';
+    html+=`<div class="pos-row">
+      <div class="pos-ico ${cls}">${t.replace(/\d+/g,'')}<br><span style="font-size:8px;">${t.match(/\d+/)?.[0]||''}</span></div>
+      <div><div class="pos-name">${t}</div><div class="pos-sub">${p.cbfis.toFixed(0)} CBFIs · Entrada: ${fmt(pp)}</div></div>
+      <div class="pos-cbfis" style="font-size:11px;color:var(--text3);">Precio actual<br><strong style="color:var(--text);font-size:13px;">${fmt(precio)}</strong></div>
+      <div class="pos-val">${fmt(va)}</div>
+      <div class="pos-rend" style="color:${plR>=0?'var(--green)':'var(--red)'};">${plR>=0?'+':''}${fmt(plR)}<br>${plpR}%</div>
+    </div>`;
+  });
+  list.innerHTML=html;
+  const yl=document.getElementById('dash-yield-label');
+  if(yl) yl.textContent=`${activPos.length} posiciones`;
+  renderPieCharts();
+}
 
-const FIBRA_SECTOR = {
-  FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
-  EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
-  FIBRAPL14:'Industrial', TERRA13:'Industrial', FHIPO14:'Hipotecario', STORAGE18:'Almacenaje',
-  FMX23:'Infraestructura', FINN13:'Hotelero', FIHO12:'Hotelero', FCFE18:'Energía'
-};
+// ── PIE CHARTS ──
+const PIE_COLORS=['#1a56db','#0e9f6e','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
+const SECTOR_COLORS={'Industrial':'#1a56db','Comercial':'#8b5cf6','Diversificado':'#0e9f6e','Hotelero':'#f59e0b','Educativo':'#06b6d4','Hipotecario':'#ec4899','Almacenaje':'#84cc16','Infraestructura':'#64748b','Energía':'#ef4444'};
 
-let allocFibras = ['FUNO11','FMTY14','DANHOS13','FSHOP13'];
+function drawPie(canvasId,data,colors) {
+  const canvas=document.getElementById(canvasId); if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const total=data.reduce((a,b)=>a+b.value,0); if(total===0){ctx.clearRect(0,0,160,160);return;}
+  const cx=80,cy=80,r=70,ir=42; ctx.clearRect(0,0,160,160);
+  let start=-Math.PI/2;
+  data.forEach((item,i)=>{
+    const slice=(item.value/total)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,start+slice);ctx.closePath();
+    ctx.fillStyle=colors[i]||PIE_COLORS[i%PIE_COLORS.length];ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    start+=slice;
+  });
+  ctx.beginPath();ctx.arc(cx,cy,ir,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+}
+
+function renderPieCharts() {
+  const pos={};
+  (window.compras||[]).forEach(c=>{if(!pos[c.fibra])pos[c.fibra]=0;pos[c.fibra]+=c.monto;});
+  (window.ventas||[]).forEach(v=>{if(pos[v.fibra])pos[v.fibra]-=v.total;});
+  const entries=Object.entries(pos).filter(([,v])=>v>0);
+  if(entries.length===0) return;
+  const fd=entries.map(([t,v])=>({label:t,value:v}));
+  const fc=fd.map((_,i)=>PIE_COLORS[i%PIE_COLORS.length]);
+  drawPie('pie-fibra',fd,fc);
+  const l1=document.getElementById('pie-fibra-legend');
+  if(l1){const tot=fd.reduce((a,b)=>a+b.value,0);l1.innerHTML=fd.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;"><div style="width:8px;height:8px;border-radius:50%;background:${fc[i]};flex-shrink:0;"></div><span>${d.label} <strong>${((d.value/tot)*100).toFixed(1)}%</strong></span></div>`).join('');}
+  const sm={};
+  entries.forEach(([t,v])=>{const s=FIBRA_SECTOR_MAP[t]||'Otro';sm[s]=(sm[s]||0)+v;});
+  const sd=Object.entries(sm).map(([label,value])=>({label,value}));
+  const sc=sd.map(d=>SECTOR_COLORS[d.label]||'#94a3b8');
+  drawPie('pie-sector',sd,sc);
+  const l2=document.getElementById('pie-sector-legend');
+  if(l2){const tot=sd.reduce((a,b)=>a+b.value,0);l2.innerHTML=sd.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;"><div style="width:8px;height:8px;border-radius:50%;background:${sc[i]};flex-shrink:0;"></div><span>${d.label} <strong>${((d.value/tot)*100).toFixed(1)}%</strong></span></div>`).join('');}
+}
+
+// ── DIVIDENDOS ──
+function calcDividendo() {
+  const cbfis=parseFloat(document.getElementById('dv-cbfis').value)||0;
+  const dist=parseFloat(document.getElementById('dv-dist').value)||0;
+  const tipo=document.getElementById('dv-tipo').value;
+  const total=cbfis*dist;
+  const isr=tipo==='rf'?total*0.30:tipo==='mixto'?total*0.15:0;
+  const fmt=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+  document.getElementById('dv-preview-total').textContent=fmt(total);
+  document.getElementById('dv-preview-isr').textContent=fmt(isr);
+  document.getElementById('dv-preview-neto').textContent=fmt(total-isr);
+}
+
+function registrarDividendo() {
+  const fibra=document.getElementById('dv-fibra').value;
+  const fecha=document.getElementById('dv-fecha').value;
+  const cbfis=parseFloat(document.getElementById('dv-cbfis').value)||0;
+  const dist=parseFloat(document.getElementById('dv-dist').value)||0;
+  const tipo=document.getElementById('dv-tipo').value;
+  if(!fecha||!cbfis||!dist) return alert('Completa todos los campos.');
+  const total=cbfis*dist;
+  const isr=tipo==='rf'?total*0.30:tipo==='mixto'?total*0.15:0;
+  const d={fibra,fecha,cbfis,dist,tipo,total,isr,neto:total-isr,ts:Date.now()};
+  window.dividendos.push(d);
+  if(typeof saveDividendo==='function') saveDividendo(d);
+  renderDividendos();
+  closeModal('modal-dividendo');
+}
+
+function renderDividendos() {
+  const divs=window.dividendos||[];
+  const fmt=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+  const tr=divs.reduce((a,d)=>a+d.total,0);
+  const ti=divs.reduce((a,d)=>a+d.isr,0);
+  const tinv=(window.compras||[]).reduce((a,b)=>a+b.monto,0);
+  const yc=tinv>0?((tr/tinv)*100).toFixed(2):0;
+  const e1=document.getElementById('div-total'),e2=document.getElementById('div-isr'),e3=document.getElementById('div-yield-costo');
+  if(e1)e1.textContent=fmt(tr);if(e2)e2.textContent=fmt(ti);if(e3)e3.textContent=yc+'%';
+  const hist=document.getElementById('hist-divs'); if(!hist) return;
+  if(divs.length===0){hist.innerHTML='<div class="empty-pos"><div class="empty-ico">💰</div><div class="empty-title">Sin dividendos registrados</div></div>';return;}
+  const tl={rf:'🔴 RF',rc:'🟢 RC',mixto:'🟡 Mixto'};
+  let html='<div style="padding:0 20px;">';
+  [...divs].reverse().forEach(d=>{
+    html+=`<div class="hist-item"><div class="hist-dot hd-div">💰</div><div class="hist-info"><div class="hist-title">${d.fibra} · ${d.cbfis} CBFIs × $${d.dist}/CBFI &nbsp;<span style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px;">${tl[d.tipo]||d.tipo}</span></div><div class="hist-date">${d.fecha} · ISR: ${fmt(d.isr)} · Neto: ${fmt(d.neto)}</div></div><div class="hist-amt pos">+${fmt(d.total)}</div></div>`;
+  });
+  hist.innerHTML=html+'</div>';
+}
+
+// ── ALLOC ──
+const FIBRA_YIELDS={FUNO11:8.44,FMTY14:7.75,DANHOS13:6.42,FSHOP13:6.11,EDUCA18:7.20,NEXT25:6.80,FNOVA17:5.90,FPLUS16:5.50,FIBRAPL14:3.79,TERRA13:4.50,FHIPO14:4.10,STORAGE18:9.50,FMX23:3.50,FINN13:7.27,FIHO12:4.80,FCFE18:0};
+let allocFibras=['FUNO11','FMTY14','DANHOS13','FSHOP13'];
 
 function updateAlloc() {
-  let suma = 0, yp = 0;
-  allocFibras.forEach(t => {
-    const sl = document.getElementById('sl-' + t);
-    if (!sl) return;
-    const v = +sl.value;
-    suma += v;
-    yp += (v / 100) * (FIBRA_YIELDS[t] || 0);
-    const el = document.getElementById('val-' + t);
-    if (el) el.textContent = v + '%';
+  let suma=0,yp=0;
+  allocFibras.forEach(t=>{
+    const sl=document.getElementById('sl-'+t); if(!sl) return;
+    const v=+sl.value; suma+=v; yp+=(v/100)*(FIBRA_YIELDS[t]||0);
+    const el=document.getElementById('val-'+t); if(el) el.textContent=v+'%';
   });
-  const se = document.getElementById('scr-suma');
-  if (se) { se.textContent = suma + '%'; se.style.color = suma === 100 ? 'var(--green)' : 'var(--red)'; }
-  const syEl = document.getElementById('scr-yield');
-  const sbEl = document.getElementById('scr-yield-big');
-  const rmEl = document.getElementById('renta-mensual');
-  if (syEl) syEl.textContent = yp.toFixed(2) + '%';
-  if (sbEl) sbEl.textContent = yp.toFixed(2) + '%';
-  if (rmEl) rmEl.textContent = '~$' + Math.round(10000 * yp / 100 / 12) + '/mes';
+  const se=document.getElementById('scr-suma');
+  if(se){se.textContent=suma+'%';se.style.color=suma===100?'var(--green)':'var(--red)';}
+  const sy=document.getElementById('scr-yield'),sb=document.getElementById('scr-yield-big'),rm=document.getElementById('renta-mensual');
+  if(sy)sy.textContent=yp.toFixed(2)+'%';
+  if(sb)sb.textContent=yp.toFixed(2)+'%';
+  if(rm)rm.textContent='~$'+Math.round(10000*yp/100/12)+'/mes';
 }
 
 function addFibraAlloc() {
-  const sel = document.getElementById('add-fibra-select');
-  if (!sel.value) return;
-  const [ticker, yld] = sel.value.split('|');
-  if (allocFibras.includes(ticker)) { alert(ticker + ' ya está en el portafolio.'); return; }
-  if (allocFibras.length >= 8) { alert('Máximo 8 FIBRAs en el portafolio.'); return; }
-
+  const sel=document.getElementById('add-fibra-select'); if(!sel.value) return;
+  const [ticker,yld]=sel.value.split('|');
+  if(allocFibras.includes(ticker)){alert(ticker+' ya está.');return;}
+  if(allocFibras.length>=8){alert('Máximo 8 FIBRAs.');return;}
   allocFibras.push(ticker);
-  const container = document.getElementById('alloc-rows');
-  const div = document.createElement('div');
-  div.className = 'alloc-row';
-  div.id = 'row-' + ticker;
-  div.innerHTML = `
-    <div class="alloc-name">${ticker}</div>
-    <input type="range" min="10" max="40" value="10" id="sl-${ticker}" oninput="updateAlloc()">
-    <div class="alloc-pct" id="val-${ticker}">10%</div>
-    <div class="alloc-yield" id="yld-${ticker}">${parseFloat(yld).toFixed(2)}%</div>
-    <button onclick="removeFibraAlloc('${ticker}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
-  `;
+  const container=document.getElementById('alloc-rows');
+  const div=document.createElement('div');
+  div.className='alloc-row';div.id='row-'+ticker;
+  div.innerHTML=`<div class="alloc-name">${ticker}</div><input type="range" min="10" max="40" value="10" id="sl-${ticker}" oninput="updateAlloc()"><div class="alloc-pct" id="val-${ticker}">10%</div><div class="alloc-yield">${parseFloat(yld).toFixed(2)}%</div><button onclick="removeFibraAlloc('${ticker}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:0 4px;">×</button>`;
   container.appendChild(div);
-
-  // Remove from dropdown
-  sel.value = '';
-  updateAlloc();
+  sel.value='';updateAlloc();
 }
 
 function removeFibraAlloc(ticker) {
-  if (allocFibras.length <= 2) { alert('El portafolio debe tener al menos 2 FIBRAs.'); return; }
-  allocFibras = allocFibras.filter(t => t !== ticker);
-  const row = document.getElementById('row-' + ticker);
-  if (row) row.remove();
+  if(allocFibras.length<=2){alert('Mínimo 2 FIBRAs.');return;}
+  allocFibras=allocFibras.filter(t=>t!==ticker);
+  const row=document.getElementById('row-'+ticker); if(row) row.remove();
   updateAlloc();
 }
 
 function confirmarPortafolio() {
   alert('✓ Portafolio confirmado. Ve al Dashboard para registrar tu primera compra.');
-  showSection('dashboard', document.querySelector('.nav-btn'));
-  document.querySelector('.nav-btn').classList.add('active');
+  showSection('dashboard',document.querySelectorAll('.nav-btn')[0]);
+  document.querySelectorAll('.nav-btn')[0].classList.add('active');
 }
 
-// ── PIE CHARTS ──
-const PIE_COLORS = ['#1a56db','#0e9f6e','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
-const SECTOR_COLORS = {
-  'Industrial':'#1a56db','Comercial':'#8b5cf6','Diversificado':'#0e9f6e',
-  'Hotelero':'#f59e0b','Educativo':'#06b6d4','Hipotecario':'#ec4899',
-  'Almacenaje':'#84cc16','Infraestructura':'#64748b','Energía':'#ef4444'
+// ── CHARTS ──
+let openChart=null;
+const chartCache={};
+const PERF_DATA={
+  FUNO11:{d:'-0.38%',m:'+3.2%',ytd:'+18.4%',a:'+22.1%'},
+  FMTY14:{d:'-0.14%',m:'+1.8%',ytd:'+28.5%',a:'+39.0%'},
+  DANHOS13:{d:'+0.95%',m:'+4.1%',ytd:'+25.3%',a:'+38.2%'},
+  FSHOP13:{d:'0.00%',m:'+2.5%',ytd:'+12.1%',a:'+15.8%'},
+  FIBRAPL14:{d:'-2.34%',m:'-1.2%',ytd:'+5.2%',a:'+8.5%'},
+  FNOVA17:{d:'+1.41%',m:'+5.8%',ytd:'+32.1%',a:'+45.9%'},
+  NEXT25:{d:'+0.50%',m:'+2.1%',ytd:'+8.3%',a:'N/D'},
+  EDUCA18:{d:'+0.20%',m:'+1.5%',ytd:'+9.4%',a:'+12.0%'},
+  TERRA13:{d:'-0.50%',m:'+1.0%',ytd:'+7.8%',a:'+10.2%'},
+  FHIPO14:{d:'-0.30%',m:'+0.8%',ytd:'+3.2%',a:'+5.0%'},
+  STORAGE18:{d:'+0.10%',m:'+3.0%',ytd:'+14.5%',a:'+18.0%'},
+  FMX23:{d:'0.00%',m:'+0.5%',ytd:'+2.1%',a:'+4.0%'},
+  FINN13:{d:'-0.20%',m:'+1.2%',ytd:'+5.5%',a:'+8.0%'},
+  FIHO12:{d:'+0.10%',m:'+0.8%',ytd:'+4.2%',a:'+6.0%'},
+  FPLUS16:{d:'0.00%',m:'+0.5%',ytd:'+2.0%',a:'+3.0%'},
+  FCFE18:{d:'0.00%',m:'0.00%',ytd:'N/D',a:'N/D'}
 };
 
-function drawPie(canvasId, data, colors) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const total = data.reduce((a,b) => a + b.value, 0);
-  if (total === 0) { ctx.clearRect(0,0,160,160); return; }
-
-  const cx = 80, cy = 80, r = 70, innerR = 40;
-  ctx.clearRect(0,0,160,160);
-  let start = -Math.PI/2;
-
-  data.forEach((item, i) => {
-    const slice = (item.value / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, start, start + slice);
-    ctx.closePath();
-    ctx.fillStyle = colors[i] || PIE_COLORS[i % PIE_COLORS.length];
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    start += slice;
-  });
-
-  // Inner circle (donut)
-  ctx.beginPath();
-  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
+function toggleChart(ticker) {
+  if(event) event.stopPropagation();
+  const panel=document.getElementById('chart-'+ticker); if(!panel) return;
+  if(openChart&&openChart!==ticker){
+    const prev=document.getElementById('chart-'+openChart);
+    if(prev){prev.classList.remove('open');prev.innerHTML='';}
+  }
+  if(panel.classList.contains('open')){panel.classList.remove('open');panel.innerHTML='';openChart=null;return;}
+  panel.classList.add('open');openChart=ticker;
+  const p=PERF_DATA[ticker]||{};
+  const pc=v=>v&&v.startsWith('+')?'color:var(--green)':v&&v!=='N/D'&&v!=='0.00%'?'color:var(--red)':'color:var(--text3)';
+  panel.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">
+      <div class="perf-item"><div class="perf-val" style="${pc(p.d)}">${p.d||'—'}</div><div class="perf-lbl">Hoy</div></div>
+      <div class="perf-item"><div class="perf-val" style="${pc(p.m)}">${p.m||'—'}</div><div class="perf-lbl">1 Mes</div></div>
+      <div class="perf-item"><div class="perf-val" style="${pc(p.ytd)}">${p.ytd||'—'}</div><div class="perf-lbl">YTD 2026</div></div>
+      <div class="perf-item"><div class="perf-val" style="${pc(p.a)}">${p.a||'—'}</div><div class="perf-lbl">1 Año</div></div>
+    </div>
+    <div id="chart-svg-${ticker}" style="height:200px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;">⟳ Cargando...</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:right;">${chartCache[ticker]?'⚡ Caché':'🔄 Alpha Vantage'} · BMV</div>`;
+  fetchChartData(ticker).then(data=>drawChart(ticker,data));
 }
 
-function renderPieCharts() {
-  const pos = {};
-  (window.compras || []).forEach(c => {
-    if (!pos[c.fibra]) pos[c.fibra] = 0;
-    pos[c.fibra] += c.monto;
+function drawChart(ticker,data) {
+  const container=document.getElementById('chart-svg-'+ticker); if(!container) return;
+  if(!data||data.length===0){container.innerHTML='<div style="font-size:12px;color:var(--text3);text-align:center;padding:20px;">Sin datos · límite de API o ticker no disponible</div>';return;}
+  const slice=data.slice(-60);
+  const prices=slice.map(d=>d.value);
+  const min=Math.min(...prices)*0.998,max=Math.max(...prices)*1.002,range=max-min;
+  const W=560,H=180,PL=8,PR=60,PT=12,PB=24,cW=W-PL-PR,cH=H-PT-PB;
+  const isUp=prices[prices.length-1]>=prices[0],lc=isUp?'#0e9f6e':'#e02424';
+  const xs=slice.map((_,i)=>PL+(i/(slice.length-1))*cW);
+  const ys=slice.map(d=>PT+cH-((d.value-min)/range)*cH);
+  let svg=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;border-radius:10px;">
+    <defs><linearGradient id="g${ticker}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${lc}" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="${lc}" stop-opacity="0"/></linearGradient></defs>
+    <rect width="${W}" height="${H}" fill="#f8fafc" rx="10"/>`;
+  [0,1,2,3].forEach(i=>{
+    const y=PT+(cH/3)*i,val=max-(range/3)*i;
+    svg+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="${W-PR+6}" y="${y+4}" font-size="10" fill="#9aa3b0" font-family="Inter,sans-serif">$${val.toFixed(2)}</text>`;
   });
-  (window.ventas || []).forEach(v => {
-    if (pos[v.fibra]) pos[v.fibra] -= v.total;
-  });
-
-  const entries = Object.entries(pos).filter(([,v]) => v > 0);
-  if (entries.length === 0) return;
-
-  // Pie por FIBRA
-  const fibraData = entries.map(([t, v]) => ({ label: t, value: v }));
-  const fibraColors = fibraData.map((_, i) => PIE_COLORS[i % PIE_COLORS.length]);
-  drawPie('pie-fibra', fibraData, fibraColors);
-
-  const legend1 = document.getElementById('pie-fibra-legend');
-  if (legend1) {
-    legend1.innerHTML = fibraData.map((d, i) => {
-      const pct = ((d.value / fibraData.reduce((a,b)=>a+b.value,0))*100).toFixed(1);
-      return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-        <div style="width:8px;height:8px;border-radius:50%;background:${fibraColors[i]};flex-shrink:0;"></div>
-        <span>${d.label} <strong>${pct}%</strong></span>
-      </div>`;
-    }).join('');
+  const area=`M ${xs[0]} ${ys[0]} `+xs.map((x,i)=>`L ${x} ${ys[i]}`).join(' ')+` L ${xs[xs.length-1]} ${PT+cH} L ${xs[0]} ${PT+cH} Z`;
+  svg+=`<path d="${area}" fill="url(#g${ticker})"/>`;
+  const line=`M ${xs[0]} ${ys[0]} `+xs.map((x,i)=>`L ${x} ${ys[i]}`).join(' ');
+  svg+=`<path d="${line}" fill="none" stroke="${lc}" stroke-width="2" stroke-linejoin="round"/>`;
+  svg+=`<circle cx="${xs[xs.length-1]}" cy="${ys[ys.length-1]}" r="4" fill="${lc}" stroke="white" stroke-width="2"/>`;
+  const step=Math.floor(slice.length/4);
+  for(let i=0;i<slice.length;i+=step){
+    const d=new Date(slice[i].time);
+    svg+=`<text x="${xs[i]}" y="${H-6}" font-size="10" fill="#9aa3b0" text-anchor="middle" font-family="Inter,sans-serif">${d.toLocaleDateString('es-MX',{month:'short',day:'numeric'})}</text>`;
   }
-
-  // Pie por sector
-  const sectorMap = {};
-  entries.forEach(([t, v]) => {
-    const sec = FIBRA_SECTOR[t] || 'Otro';
-    sectorMap[sec] = (sectorMap[sec] || 0) + v;
-  });
-  const sectorData = Object.entries(sectorMap).map(([label, value]) => ({ label, value }));
-  const sectorColors = sectorData.map(d => SECTOR_COLORS[d.label] || '#94a3b8');
-  drawPie('pie-sector', sectorData, sectorColors);
-
-  const legend2 = document.getElementById('pie-sector-legend');
-  if (legend2) {
-    const total = sectorData.reduce((a,b)=>a+b.value,0);
-    legend2.innerHTML = sectorData.map((d, i) => {
-      const pct = ((d.value/total)*100).toFixed(1);
-      return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-        <div style="width:8px;height:8px;border-radius:50%;background:${sectorColors[i]};flex-shrink:0;"></div>
-        <span>${d.label} <strong>${pct}%</strong></span>
-      </div>`;
-    }).join('');
-  }
+  svg+='</svg>';
+  container.innerHTML=svg;
 }
 
-// SIMULADOR
-let modo = 'reinv';
+// ── BIOMETRÍA ──
+async function setupBiometrics() {
+  if(!window.PublicKeyCredential){alert('Tu dispositivo no soporta biometría.');return;}
+  try {
+    const ok=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    if(!ok){alert('No se detectó Face ID / Touch ID.');return;}
+    const cred=await navigator.credentials.create({publicKey:{
+      challenge:crypto.getRandomValues(new Uint8Array(32)),
+      rp:{name:'FIBRAS App',id:location.hostname},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)),name:document.getElementById('user-email').textContent,displayName:'Usuario'},
+      pubKeyCredParams:[{type:'public-key',alg:-7}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+      timeout:60000
+    }});
+    if(cred){localStorage.setItem('fbx_biometric','enabled');alert('✓ Face ID / Touch ID configurado.');}
+  } catch(e){if(e.name!=='NotAllowedError')alert('Error: '+e.message);}
+}
 
+// ── ACTUALIZAR DATOS ──
+function copyPrompt() {
+  const txt=document.getElementById('update-prompt').textContent;
+  navigator.clipboard.writeText(txt).then(()=>alert('✓ Prompt copiado. Pégalo en Claude.'));
+}
+
+document.getElementById('update-input').addEventListener('input',()=>{
+  const raw=document.getElementById('update-input').value.trim();
+  const prev=document.getElementById('update-preview');
+  const err=document.getElementById('update-error');
+  if(!raw){if(prev)prev.style.display='none';if(err)err.style.display='none';return;}
+  try{
+    const d=JSON.parse(raw);
+    if(d.fibras&&d.fibras.length>0){
+      const el=document.getElementById('update-preview-count');if(el)el.textContent=d.fibras.length;
+      if(prev)prev.style.display='block';if(err)err.style.display='none';
+    }else throw new Error();
+  }catch(e){if(prev)prev.style.display='none';if(err)err.style.display='block';}
+});
+
+function applyUpdate() {
+  const raw=document.getElementById('update-input').value.trim();
+  if(!raw) return alert('Pega la respuesta de Claude primero.');
+  let data;
+  try{data=JSON.parse(raw);}catch(e){return alert('JSON inválido.');}
+  if(!data.fibras||!data.fibras.length) return alert('El JSON no tiene datos.');
+  localStorage.setItem('fbx_screening_data',JSON.stringify(data));
+  localStorage.setItem('fbx_last_update',Date.now().toString());
+  applyScreeningData(data);
+  const now=new Date();
+  const ds=now.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});
+  const el=document.getElementById('screening-update-date');if(el)el.textContent='actualizado '+ds;
+  closeModal('modal-update');
+  document.getElementById('update-input').value='';
+  alert('✓ '+data.fibras.length+' FIBRAs actualizadas.');
+}
+
+function applyScreeningData(data) {
+  data.fibras.forEach(f=>{
+    const card=document.querySelector(`[onclick="toggleChart('${f.ticker}')"]`);
+    if(!card) return;
+    const fms=card.querySelectorAll('.fm-val');
+    if(fms.length>=3){
+      const y=parseFloat(f.yield);
+      fms[0].textContent=y.toFixed(2)+'%';fms[0].className='fm-val '+(y>=5&&y<=9?'pos':'neg');
+      const desc=parseFloat(f.descuento);
+      fms[1].textContent=(desc>0?'+':'−')+Math.abs(desc).toFixed(1)+'%';fms[1].className='fm-val '+(desc<0?'pos':'neg');
+      const oc=parseFloat(f.ocupacion);
+      fms[2].textContent=oc.toFixed(1)+'%';fms[2].className='fm-val '+(oc>=90?'':'neg');
+    }
+    const badge=card.querySelector('.sig-badge');
+    if(badge&&f.señal){
+      const s=f.señal.toLowerCase();
+      badge.className=s==='comprar'?'sig-badge sig-buy':s==='observar'?'sig-badge sig-watch':'sig-badge sig-skip';
+      badge.textContent=s==='comprar'?'● Comprar':s==='observar'?'● Observar':'✗ No cumple';
+    }
+    const dots=card.querySelectorAll('.cd');
+    if(dots.length>=5){
+      dots[0].className='cd '+(f.yield>=5&&f.yield<=9?'cd-ok':'cd-fail');
+      dots[1].className='cd '+(f.descuento<0?'cd-ok':f.descuento<=10?'cd-warn':'cd-fail');
+      dots[2].className='cd '+(f.ocupacion>=90?'cd-ok':'cd-fail');
+      dots[3].className='cd '+(f.ltv<40?'cd-ok':f.ltv<=45?'cd-warn':'cd-fail');
+    }
+    if(FIBRA_YIELDS[f.ticker]) FIBRA_YIELDS[f.ticker]=parseFloat(f.yield);
+  });
+  updateAlloc();
+}
+
+function loadSavedScreeningData() {
+  const saved=localStorage.getItem('fbx_screening_data');
+  const el=document.getElementById('screening-update-date');
+  if(saved){
+    try{
+      applyScreeningData(JSON.parse(saved));
+      const ts=localStorage.getItem('fbx_last_update');
+      if(ts&&el){const d=new Date(parseInt(ts));el.textContent='actualizado '+d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});}
+    }catch(e){}
+  }else{if(el)el.textContent='datos 1T26 · presiona ⟳ para actualizar';}
+}
+
+// ── SIMULADOR ──
+let modo='reinv';
 function setModo(m) {
-  modo = m;
-  document.getElementById('btn-reinv').classList.toggle('active', m==='reinv');
-  document.getElementById('btn-ret').classList.toggle('active', m==='ret');
-  const desc = document.getElementById('modo-desc');
-  if (m==='reinv') {
-    desc.style.background='var(--accent-light)'; desc.style.borderColor='var(--accent)';
-    desc.innerHTML='<strong>Reinversión total:</strong> Cada dividendo se suma al capital y genera más dividendos. Máximo interés compuesto — ideal para fase de acumulación.';
-    document.getElementById('lbl-da').textContent='Dividendo anual (año final)';
-    document.getElementById('lbl-dm').textContent='Renta mensual (año final)';
-  } else {
-    desc.style.background='var(--yellow-light)'; desc.style.borderColor='var(--yellow)';
-    desc.innerHTML='<strong>Retiro de dividendos:</strong> Cada mes retiras el dividendo como renta pasiva. El capital crece solo por aportaciones. Ideal para vivir de tus inversiones.';
-    document.getElementById('lbl-da').textContent='Renta anual (estable)';
-    document.getElementById('lbl-dm').textContent='Renta mensual (estable)';
+  modo=m;
+  document.getElementById('btn-reinv').classList.toggle('active',m==='reinv');
+  document.getElementById('btn-ret').classList.toggle('active',m==='ret');
+  const desc=document.getElementById('modo-desc');
+  if(m==='reinv'){
+    if(desc){desc.style.background='var(--accent-light)';desc.style.borderColor='var(--accent)';
+    desc.innerHTML='<strong>Reinversión total:</strong> Cada dividendo se suma al capital. Máximo interés compuesto — ideal para acumulación.';}
+    const la=document.getElementById('lbl-da'),lm=document.getElementById('lbl-dm');
+    if(la)la.textContent='Dividendo anual (año final)';if(lm)lm.textContent='Renta mensual (año final)';
+  }else{
+    if(desc){desc.style.background='var(--yellow-light)';desc.style.borderColor='var(--yellow)';
+    desc.innerHTML='<strong>Retiro de dividendos:</strong> Cada mes retiras el dividendo como renta pasiva. Ideal para vivir de tus inversiones.';}
+    const la=document.getElementById('lbl-da'),lm=document.getElementById('lbl-dm');
+    if(la)la.textContent='Renta anual (estable)';if(lm)lm.textContent='Renta mensual (estable)';
   }
   calcSim();
 }
 
 function calcSim() {
-  const ini = parseFloat(document.getElementById('sim-ini').value)||0;
-  const men = parseFloat(document.getElementById('sim-men').value)||0;
-  const anos = parseInt(document.getElementById('sim-anos').value)||0;
-  const ya = parseFloat(document.getElementById('sim-yield').value)/100||0;
-  const ms = anos*12, tM = ya/12;
-  const fmt = n => '$'+Math.round(n).toLocaleString('es-MX');
-  const tap = men*ms;
-  let cap, dAcum;
-
-  if (modo==='reinv') {
-    cap = ini*Math.pow(1+tM,ms);
-    cap += tM>0 ? men*(Math.pow(1+tM,ms)-1)/tM : tap;
-    dAcum = cap-ini-tap;
-  } else {
-    cap = ini+tap;
-    let c=ini; dAcum=0;
-    for(let m=1;m<=ms;m++){c+=men; dAcum+=c*tM;}
+  const ini=parseFloat(document.getElementById('sim-ini').value)||0;
+  const men=parseFloat(document.getElementById('sim-men').value)||0;
+  const anos=parseInt(document.getElementById('sim-anos').value)||0;
+  const ya=parseFloat(document.getElementById('sim-yield').value)/100||0;
+  const ms=anos*12,tM=ya/12;
+  const fmt=n=>'$'+Math.round(n).toLocaleString('es-MX');
+  const tap=men*ms;
+  let cap,dAcum;
+  if(modo==='reinv'){
+    cap=ini*Math.pow(1+tM,ms);
+    cap+=tM>0?men*(Math.pow(1+tM,ms)-1)/tM:tap;
+    dAcum=cap-ini-tap;
+  }else{
+    cap=ini+tap;let c=ini;dAcum=0;
+    for(let m=1;m<=ms;m++){c+=men;dAcum+=c*tM;}
   }
-
-  const da=cap*ya, dm=da/12;
-  const gan = modo==='reinv' ? dAcum : dAcum+(cap-ini-tap);
-
-  document.getElementById('sv-cap').textContent=fmt(cap);
-  document.getElementById('sv-da').textContent=fmt(da);
-  document.getElementById('sv-dm').textContent=fmt(dm);
-  document.getElementById('sv-gan').textContent=fmt(gan);
-  document.getElementById('sv-ini').textContent=fmt(ini);
-  document.getElementById('sv-tap').textContent=fmt(tap);
-  document.getElementById('sv-dac').textContent=fmt(dAcum);
-
-  const hitos=[10000,30000,60000,100000];
-  let h='';
+  const da=cap*ya,dm=da/12;
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('sv-cap',fmt(cap));set('sv-da',fmt(da));set('sv-dm',fmt(dm));
+  set('sv-gan',fmt(modo==='reinv'?dAcum:dAcum+(cap-ini-tap)));
+  set('sv-ini',fmt(ini));set('sv-tap',fmt(tap));set('sv-dac',fmt(dAcum));
+  const hitos=[10000,30000,60000,100000];let h='';
   hitos.forEach(meta=>{
-    const cn=tM>0?meta/tM:Infinity;
-    let mh=Infinity;
-    if(tM>0){let c=ini; for(let m=0;m<=600;m++){c=c*(1+tM)+men; if(c>=cn){mh=m+1;break;}}}
+    const cn=tM>0?meta/tM:Infinity;let mh=Infinity;
+    if(tM>0){let c=ini;for(let m=0;m<=600;m++){c=c*(1+tM)+men;if(c>=cn){mh=m+1;break;}}}
     const ok=mh<=600;
     h+=`<div class="hito"><div class="hito-val">${ok?Math.ceil(mh/12)+' años':'+50a'}</div><div class="hito-lbl">${fmt(meta)}/mes</div></div>`;
   });
-  document.getElementById('sim-hitos').innerHTML=h;
+  const sh=document.getElementById('sim-hitos');if(sh)sh.innerHTML=h;
 }
 
-// ── DIVIDENDOS ──
-function calcDividendo() {
-  const cbfis = parseFloat(document.getElementById('dv-cbfis').value) || 0;
-  const dist = parseFloat(document.getElementById('dv-dist').value) || 0;
-  const tipo = document.getElementById('dv-tipo').value;
-  const total = cbfis * dist;
-  let isr = 0;
-  if (tipo === 'rf') isr = total * 0.30;
-  else if (tipo === 'mixto') isr = total * 0.50 * 0.30;
-  const neto = total - isr;
-  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
-  document.getElementById('dv-preview-total').textContent = fmt(total);
-  document.getElementById('dv-preview-isr').textContent = fmt(isr);
-  document.getElementById('dv-preview-neto').textContent = fmt(neto);
-}
-
-function registrarDividendo() {
-  const fibra = document.getElementById('dv-fibra').value;
-  const fecha = document.getElementById('dv-fecha').value;
-  const cbfis = parseFloat(document.getElementById('dv-cbfis').value) || 0;
-  const dist = parseFloat(document.getElementById('dv-dist').value) || 0;
-  const tipo = document.getElementById('dv-tipo').value;
-  if (!fecha || !cbfis || !dist) return alert('Completa todos los campos.');
-  const total = cbfis * dist;
-  let isr = 0;
-  if (tipo === 'rf') isr = total * 0.30;
-  else if (tipo === 'mixto') isr = total * 0.50 * 0.30;
-  const neto = total - isr;
-  const div = { fibra, fecha, cbfis, dist, tipo, total, isr, neto, ts: Date.now() };
-  window.dividendos.push(div);
-  if (typeof saveDividendo === 'function') saveDividendo(div);
-  renderDividendos();
-  closeModal('modal-dividendo');
-  // Reset preview
-  document.getElementById('dv-preview-total').textContent = '$0.00';
-  document.getElementById('dv-preview-isr').textContent = '$0.00';
-  document.getElementById('dv-preview-neto').textContent = '$0.00';
-}
-
-function renderDividendos() {
-  const divs = window.dividendos || [];
-  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2});
-  const totalRecibido = divs.reduce((a,d) => a + d.total, 0);
-  const totalISR = divs.reduce((a,d) => a + d.isr, 0);
-  const totalInv = (window.compras||[]).reduce((a,b) => a + b.monto, 0);
-  const yieldCosto = totalInv > 0 ? ((totalRecibido / totalInv) * 100).toFixed(2) : 0;
-
-  const elTotal = document.getElementById('div-total');
-  const elISR = document.getElementById('div-isr');
-  const elYield = document.getElementById('div-yield-costo');
-  if (elTotal) elTotal.textContent = fmt(totalRecibido);
-  if (elISR) elISR.textContent = fmt(totalISR);
-  if (elYield) elYield.textContent = yieldCosto + '%';
-
-  const hist = document.getElementById('hist-divs');
-  if (!hist) return;
-  if (divs.length === 0) {
-    hist.innerHTML = '<div class="empty-pos"><div class="empty-ico">💰</div><div class="empty-title">Sin dividendos registrados</div><div class="empty-sub">Registra cada distribución cuando te llegue el pago</div></div>';
-    return;
-  }
-  const tipoLabel = { rf: '🔴 RF', rc: '🟢 RC', mixto: '🟡 Mixto' };
-  let html = '<div style="padding:0 20px;">';
-  [...divs].reverse().forEach(d => {
-    html += `<div class="hist-item">
-      <div class="hist-dot hd-div">💰</div>
-      <div class="hist-info">
-        <div class="hist-title">${d.fibra} · ${d.cbfis} CBFIs × $${d.dist}/CBFI &nbsp; <span style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px;">${tipoLabel[d.tipo]||d.tipo}</span></div>
-        <div class="hist-date">${d.fecha} · ISR: ${fmt(d.isr)} · Neto: ${fmt(d.neto)}</div>
-      </div>
-      <div class="hist-amt pos">+${fmt(d.total)}</div>
-    </div>`;
-  });
-  html += '</div>';
-  hist.innerHTML = html;
-}
-
-// ── FACE ID / GUARDAR CREDENCIALES ──
-// Usamos la Web Authentication API (WebAuthn) para solicitar
-// al navegador que guarde y use biometría (Face ID / Touch ID / Windows Hello)
-async function setupBiometrics() {
-  if (!window.PublicKeyCredential) {
-    alert('Tu dispositivo no soporta autenticación biométrica.');
-    return;
-  }
-  try {
-    // Verificar disponibilidad de autenticador de plataforma (Face ID, Touch ID)
-    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    if (!available) {
-      alert('No se detectó Face ID o Touch ID en este dispositivo.');
-      return;
-    }
-    // Crear credencial biométrica
-    const cred = await navigator.credentials.create({
-      publicKey: {
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: 'FIBRAS App', id: location.hostname },
-        user: {
-          id: crypto.getRandomValues(new Uint8Array(16)),
-          name: document.getElementById('user-email').textContent,
-          displayName: 'Francisco'
-        },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'required'
-        },
-        timeout: 60000
-      }
-    });
-    if (cred) {
-      localStorage.setItem('fbx_biometric', 'enabled');
-      alert('✓ Face ID / Touch ID configurado. La próxima vez que abras la app podrás usar biometría.');
-    }
-  } catch(e) {
-    if (e.name === 'NotAllowedError') alert('Cancelado. Puedes intentarlo de nuevo desde Configuración.');
-    else alert('No se pudo configurar: ' + e.message);
-  }
-}
-
-// ── CHART — Lightweight Charts + Alpha Vantage + Cache ──
-const FIBRA_SECTORS_CHART = {
-  FUNO11:'Diversificado', FMTY14:'Industrial', DANHOS13:'Comercial', FSHOP13:'Comercial',
-  EDUCA18:'Educativo', NEXT25:'Industrial', FNOVA17:'Industrial', FPLUS16:'Diversificado',
-  FIBRAPL14:'Industrial', TERRA13:'Industrial', FHIPO14:'Hipotecario', STORAGE18:'Almacenaje',
-  FMX23:'Infraestructura', FCFE18:'Energía', FINN13:'Hotelero', FIHO12:'Hotelero'
-};
-
-let openChart = null;
-
-function calcPerf(data, days) {
-  if (!data || data.length < 2) return null;
-  const last = data[data.length - 1].value;
-  const from = data[Math.max(0, data.length - 1 - days)].value;
-  return ((last - from) / from * 100).toFixed(2);
-}
-
-function perfColor(v) {
-  if (v === null || v === undefined) return 'var(--text3)';
-  return parseFloat(v) >= 0 ? 'var(--green)' : 'var(--red)';
-}
-
-function perfLabel(v) {
-  if (v === null) return '—';
-  return (parseFloat(v) >= 0 ? '+' : '') + v + '%';
-}
-
-function toggleChart(ticker) {
-  event.stopPropagation();
-  const panel = document.getElementById('chart-' + ticker);
-  if (!panel) return;
-
-  if (openChart && openChart !== ticker) {
-    const prev = document.getElementById('chart-' + openChart);
-    if (prev) { prev.classList.remove('open'); prev.innerHTML = ''; }
-  }
-
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open');
-    panel.innerHTML = '';
-    openChart = null;
-    return;
-  }
-
-  panel.classList.add('open');
-  openChart = ticker;
-
-  // Show loading
-  panel.innerHTML = `
-    <div class="period-tabs">
-      <button class="ptab active" id="ptab-1M-${ticker}" onclick="filterChart('${ticker}',30,this)">1M</button>
-      <button class="ptab" onclick="filterChart('${ticker}',60,this)">2M</button>
-      <button class="ptab" onclick="filterChart('${ticker}',90,this)">3M</button>
-    </div>
-    <div id="lc-${ticker}" style="height:220px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;">
-      <div style="color:var(--text3);font-size:13px;">⟳ Cargando gráfica${chartCache[ticker] ? ' (caché)' : ''}...</div>
-    </div>
-    <div class="perf-grid" id="perf-${ticker}">
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Semana</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">1 Mes</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">3 Meses</div></div>
-      <div class="perf-item"><div class="perf-val neu">—</div><div class="perf-lbl">YTD est.</div></div>
-    </div>
-    <div style="font-size:10px;color:var(--text3);margin-top:6px;display:flex;justify-content:space-between;">
-      <span id="cache-status-${ticker}">${chartCache[ticker] ? '⚡ Datos en caché · sin call adicional' : '🔄 Descargando de Alpha Vantage...'}</span>
-      <span>Últimos 90 días</span>
-    </div>
-  `;
-
-  fetchChartData(ticker).then(data => {
-    const container = document.getElementById('lc-' + ticker);
-    if (!container) return;
-
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px;">Sin datos disponibles · límite de API alcanzado</div>';
-      document.getElementById('cache-status-' + ticker).textContent = '⚠ Usa el botón Actualizar datos mañana';
-      return;
-    }
-
-    // Update cache status
-    const cs = document.getElementById('cache-status-' + ticker);
-    if (cs) cs.textContent = '⚡ Datos en caché · sin call adicional';
-
-    // Draw with canvas
-    drawLightChart(ticker, data, 30);
-
-    // Update performance
-    const p1w = calcPerf(data, 5);
-    const p1m = calcPerf(data, 21);
-    const p3m = calcPerf(data, 63);
-    const pYTD = PERF_DATA[ticker]?.['YTD'] || null;
-
-    const pg = document.getElementById('perf-' + ticker);
-    if (pg) pg.innerHTML = `
-      <div class="perf-item"><div class="perf-val" style="color:${perfColor(p1w)};">${perfLabel(p1w)}</div><div class="perf-lbl">1 Semana</div></div>
-      <div class="perf-item"><div class="perf-val" style="color:${perfColor(p1m)};">${perfLabel(p1m)}</div><div class="perf-lbl">1 Mes</div></div>
-      <div class="perf-item"><div class="perf-val" style="color:${perfColor(p3m)};">${perfLabel(p3m)}</div><div class="perf-lbl">3 Meses</div></div>
-      <div class="perf-item"><div class="perf-val" style="color:${pYTD ? perfColor(parseFloat(pYTD)) : 'var(--text3)'};">${pYTD || '—'}</div><div class="perf-lbl">YTD 2026</div></div>
-    `;
-  });
-}
-
-function drawLightChart(ticker, data, days) {
-  const container = document.getElementById('lc-' + ticker);
-  if (!container) return;
-
-  const slice = data.slice(Math.max(0, data.length - days));
-  const prices = slice.map(d => d.value);
-  const min = Math.min(...prices) * 0.998;
-  const max = Math.max(...prices) * 1.002;
-  const range = max - min;
-  const W = container.offsetWidth || 600;
-  const H = 220;
-  const PAD = { t:16, r:60, b:28, l:8 };
-  const cW = W - PAD.l - PAD.r;
-  const cH = H - PAD.t - PAD.b;
-
-  const isUp = prices[prices.length-1] >= prices[0];
-  const lineColor = isUp ? '#0e9f6e' : '#e02424';
-  const fillColor = isUp ? 'rgba(14,159,110,0.08)' : 'rgba(224,36,36,0.06)';
-
-  const xs = slice.map((_, i) => PAD.l + (i / (slice.length - 1)) * cW);
-  const ys = slice.map(d => PAD.t + cH - ((d.value - min) / range) * cH);
-
-  let svg = `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-    <defs>
-      <linearGradient id="grad-${ticker}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.15"/>
-        <stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <rect width="${W}" height="${H}" fill="#f8fafc" rx="10"/>`;
-
-  // Grid lines
-  for (let i = 0; i <= 3; i++) {
-    const y = PAD.t + (cH / 3) * i;
-    const val = max - (range / 3) * i;
-    svg += `<line x1="${PAD.l}" y1="${y}" x2="${W - PAD.r}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>
-    <text x="${W - PAD.r + 6}" y="${y + 4}" font-size="10" fill="#9aa3b0" font-family="Inter,sans-serif">$${val.toFixed(2)}</text>`;
-  }
-
-  // Area fill
-  const areaPath = `M ${xs[0]} ${ys[0]} ` + xs.map((x,i) => `L ${x} ${ys[i]}`).join(' ') +
-    ` L ${xs[xs.length-1]} ${PAD.t + cH} L ${xs[0]} ${PAD.t + cH} Z`;
-  svg += `<path d="${areaPath}" fill="url(#grad-${ticker})"/>`;
-
-  // Line
-  const linePath = `M ${xs[0]} ${ys[0]} ` + xs.map((x,i) => `L ${x} ${ys[i]}`).join(' ');
-  svg += `<path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round"/>`;
-
-  // Last price dot
-  const lx = xs[xs.length-1], ly = ys[ys.length-1];
-  svg += `<circle cx="${lx}" cy="${ly}" r="4" fill="${lineColor}" stroke="white" stroke-width="2"/>`;
-
-  // Date labels
-  const step = Math.floor(slice.length / 4);
-  for (let i = 0; i < slice.length; i += step) {
-    const d = new Date(slice[i].time);
-    const label = d.toLocaleDateString('es-MX', { month:'short', day:'numeric' });
-    svg += `<text x="${xs[i]}" y="${H - 6}" font-size="10" fill="#9aa3b0" text-anchor="middle" font-family="Inter,sans-serif">${label}</text>`;
-  }
-
-  svg += '</svg>';
-  container.innerHTML = svg;
-}
-
-function filterChart(ticker, days, btn) {
-  event.stopPropagation();
-  document.querySelectorAll(`#chart-${ticker} .ptab`).forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const data = chartCache[ticker]?.data;
-  if (data) drawLightChart(ticker, data, days);
-}
-
-// Static performance data (updated manually or via Alpha Vantage)
-const PERF_DATA = {
-  FUNO11:  { '1D':'-0.38%', '1M':'+3.2%',  '1A':'+22.1%', 'YTD':'+18.4%' },
-  FMTY14:  { '1D':'-0.14%', '1M':'+1.8%',  '1A':'+39.0%', 'YTD':'+28.5%' },
-  DANHOS13:{ '1D':'+0.95%', '1M':'+4.1%',  '1A':'+38.2%', 'YTD':'+25.3%' },
-  FSHOP13: { '1D':'0.00%',  '1M':'+2.5%',  '1A':'+15.8%', 'YTD':'+12.1%' },
-  FIBRAPL14:{'1D':'-2.34%', '1M':'-1.2%',  '1A':'+8.5%',  'YTD':'+5.2%'  },
-  FNOVA17: { '1D':'+1.41%', '1M':'+5.8%',  '1A':'+45.9%', 'YTD':'+32.1%' },
-  NEXT25:  { '1D':'+0.50%', '1M':'+2.1%',  '1A':'N/D',    'YTD':'+8.3%'  },
-  EDUCA18: { '1D':'+0.20%', '1M':'+1.5%',  '1A':'+12.0%', 'YTD':'+9.4%'  },
-  TERRA13: { '1D':'-0.50%', '1M':'+1.0%',  '1A':'+10.2%', 'YTD':'+7.8%'  },
-  FHIPO14: { '1D':'-0.30%', '1M':'+0.8%',  '1A':'+5.0%',  'YTD':'+3.2%'  },
-  STORAGE18:{'1D':'+0.10%', '1M':'+3.0%',  '1A':'+18.0%', 'YTD':'+14.5%' },
-  FMX23:   { '1D':'0.00%',  '1M':'+0.5%',  '1A':'+4.0%',  'YTD':'+2.1%'  },
-  FCFE18:  { '1D':'0.00%',  '1M':'0.00%',  '1A':'N/D',    'YTD':'N/D'    },
-  FINN13:  { '1D':'-0.20%', '1M':'+1.2%',  '1A':'+8.0%',  'YTD':'+5.5%'  },
-  FIHO12:  { '1D':'+0.10%', '1M':'+0.8%',  '1A':'+6.0%',  'YTD':'+4.2%'  },
-  FPLUS16: { '1D':'0.00%',  '1M':'+0.5%',  '1A':'+3.0%',  'YTD':'+2.0%'  },
-};
-
-let openChart = null;
-
-function toggleChart(ticker) {
-  event.stopPropagation();
-  const panel = document.getElementById('chart-' + ticker);
-  if (!panel) return;
-
-  if (openChart && openChart !== ticker) {
-    const prev = document.getElementById('chart-' + openChart);
-    if (prev) { prev.classList.remove('open'); prev.innerHTML = ''; }
-  }
-
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open');
-    panel.innerHTML = '';
-    openChart = null;
-    return;
-  }
-
-  panel.classList.add('open');
-  openChart = ticker;
-
-  const tvTicker = TV_TICKERS[ticker];
-  const perf = PERF_DATA[ticker] || {};
-
-  const perfColor = v => {
-    if (!v || v === 'N/D') return 'neu';
-    return v.startsWith('+') ? 'pos' : v === '0.00%' ? 'neu' : 'neg';
-  };
-
-  panel.innerHTML = `
-    <div class="period-tabs">
-      <button class="ptab active" onclick="changePeriod('${ticker}','1D',this)">1D</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','5D',this)">5D</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','1M',this)">1M</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','6M',this)">6M</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','YTD',this)">YTD</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','12M',this)">1A</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','60M',this)">5A</button>
-      <button class="ptab" onclick="changePeriod('${ticker}','ALL',this)">Todo</button>
-    </div>
-    <div id="tv-container-${ticker}" style="height:320px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-      <iframe
-        src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_${ticker}&symbol=${tvTicker}&interval=D&range=1D&theme=light&style=3&locale=es_419&hide_top_toolbar=0&hide_legend=0&save_image=0&hide_volume=0&withdateranges=1"
-        style="width:100%;height:100%;border:none;"
-        id="tv-frame-${ticker}"
-        allowtransparency="true"
-        scrolling="no"
-      ></iframe>
-    </div>
-    <div class="perf-grid">
-      <div class="perf-item">
-        <div class="perf-val ${perfColor(perf['1D'])}">${perf['1D']||'—'}</div>
-        <div class="perf-lbl">Hoy</div>
-      </div>
-      <div class="perf-item">
-        <div class="perf-val ${perfColor(perf['1M'])}">${perf['1M']||'—'}</div>
-        <div class="perf-lbl">1 Mes</div>
-      </div>
-      <div class="perf-item">
-        <div class="perf-val ${perfColor(perf['YTD'])}">${perf['YTD']||'—'}</div>
-        <div class="perf-lbl">YTD 2026</div>
-      </div>
-      <div class="perf-item">
-        <div class="perf-val ${perfColor(perf['1A'])}">${perf['1A']||'—'}</div>
-        <div class="perf-lbl">1 Año</div>
-      </div>
-    </div>
-    <div style="font-size:10px;color:var(--text3);margin-top:8px;display:flex;justify-content:space-between;">
-      <span>Rendimientos aproximados · datos BMV</span>
-      <span>Gráfica: TradingView</span>
-    </div>
-  `;
-}
-
-function copyPrompt() {
-  const txt = document.getElementById('update-prompt').textContent;
-  navigator.clipboard.writeText(txt).then(() => {
-    alert('✓ Prompt copiado. Pégalo en Claude y trae el JSON aquí.');
-  });
-}
-
-// Live JSON validation as user types
-document.addEventListener('DOMContentLoaded', () => {
-  const ta = document.getElementById('update-input');
-  if (ta) ta.addEventListener('input', validateUpdateJSON);
-});
-
-function validateUpdateJSON() {
-  const raw = document.getElementById('update-input').value.trim();
-  const prev = document.getElementById('update-preview');
-  const err = document.getElementById('update-error');
-  if (!raw) { prev.style.display='none'; err.style.display='none'; return; }
-  try {
-    const d = JSON.parse(raw);
-    if (d.fibras && d.fibras.length > 0) {
-      document.getElementById('update-preview-count').textContent = d.fibras.length;
-      prev.style.display='block'; err.style.display='none';
-    } else { throw new Error(); }
-  } catch(e) { prev.style.display='none'; err.style.display='block'; }
-}
-
-function applyUpdate() {
-  const raw = document.getElementById('update-input').value.trim();
-  if (!raw) return alert('Pega la respuesta de Claude primero.');
-
-  let data;
-  try { data = JSON.parse(raw); } catch(e) { return alert('JSON inválido. Verifica que copiaste toda la respuesta.'); }
-  if (!data.fibras || !data.fibras.length) return alert('El JSON no tiene datos de FIBRAs.');
-
-  // Store in localStorage for persistence
-  localStorage.setItem('fbx_screening_data', JSON.stringify(data));
-  localStorage.setItem('fbx_last_update', Date.now().toString());
-
-  // Apply to UI
-  applyScreeningData(data);
-
-  // Update date label
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('es-MX', {day:'numeric', month:'short', year:'numeric'});
-  const scrEl = document.getElementById('screening-update-date');
-  if (scrEl) scrEl.textContent = `actualizado ${dateStr}`;
-
-  closeModal('modal-update');
-  document.getElementById('update-input').value = '';
-  document.getElementById('update-preview').style.display = 'none';
-  alert(`✓ ${data.fibras.length} FIBRAs actualizadas correctamente.`);
-}
-
-function applyScreeningData(data) {
-  data.fibras.forEach(f => {
-    const ticker = f.ticker;
-    const card = document.querySelector(`[onclick="toggleChart('${ticker}')"]`);
-    if (!card) return;
-
-    const fms = card.querySelectorAll('.fm-val');
-    if (fms.length >= 3) {
-      // Yield
-      const yieldVal = parseFloat(f.yield);
-      fms[0].textContent = yieldVal.toFixed(2) + '%';
-      fms[0].className = 'fm-val ' + (yieldVal >= 5 && yieldVal <= 9 ? 'pos' : 'neg');
-
-      // Descuento NAV
-      const desc = parseFloat(f.descuento);
-      const descSign = desc > 0 ? '+' : '−';
-      fms[1].textContent = descSign + Math.abs(desc).toFixed(1) + '%';
-      fms[1].className = 'fm-val ' + (desc < 0 ? 'pos' : 'neg');
-
-      // Ocupación
-      const ocup = parseFloat(f.ocupacion);
-      fms[2].textContent = ocup.toFixed(1) + '%';
-      fms[2].className = 'fm-val ' + (ocup >= 90 ? '' : 'neg');
-    }
-
-    // Señal badge
-    const badge = card.querySelector('.sig-badge');
-    if (badge && f.señal) {
-      const s = f.señal.toLowerCase();
-      if (s === 'comprar') {
-        badge.className = 'sig-badge sig-buy';
-        badge.textContent = '● Comprar';
-      } else if (s === 'observar') {
-        badge.className = 'sig-badge sig-watch';
-        badge.textContent = '● Observar';
-      } else {
-        badge.className = 'sig-badge sig-skip';
-        badge.textContent = '✗ No cumple';
-      }
-    }
-
-    // Update criteria dots based on rules
-    const dots = card.querySelectorAll('.cd');
-    if (dots.length >= 5) {
-      const yOk = f.yield >= 5 && f.yield <= 9;
-      const nOk = f.descuento < 0;
-      const nWarn = f.descuento >= 0 && f.descuento <= 10;
-      const oOk = f.ocupacion >= 90;
-      const lOk = f.ltv < 40;
-      const lWarn = f.ltv >= 40 && f.ltv <= 45;
-
-      dots[0].className = 'cd ' + (yOk ? 'cd-ok' : 'cd-fail');
-      dots[1].className = 'cd ' + (nOk ? 'cd-ok' : nWarn ? 'cd-warn' : 'cd-fail');
-      dots[2].className = 'cd ' + (oOk ? 'cd-ok' : 'cd-fail');
-      dots[3].className = 'cd ' + (lOk ? 'cd-ok' : lWarn ? 'cd-warn' : 'cd-fail');
-      // dot 4 = AFFO, keep as is
-    }
-
-    // Update FIBRA_YIELDS for alloc recalculation
-    if (FIBRA_YIELDS[ticker]) FIBRA_YIELDS[ticker] = parseFloat(f.yield);
-
-    // Update PERF_DATA yield
-    if (PERF_DATA[ticker]) PERF_DATA[ticker]['yield'] = f.yield;
-
-    // Clear chart cache so next open gets fresh data
-    if (chartCache[ticker]) delete chartCache[ticker];
-  });
-
-  // Recalculate alloc yield
-  updateAlloc();
-}
-
-// Load saved screening data on startup
-function loadSavedScreeningData() {
-  const saved = localStorage.getItem('fbx_screening_data');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      applyScreeningData(data);
-      const ts = localStorage.getItem('fbx_last_update');
-      if (ts) {
-        const d = new Date(parseInt(ts));
-        const el = document.getElementById('screening-update-date');
-        if (el) el.textContent = `actualizado ${d.toLocaleDateString('es-MX', {day:'numeric', month:'short', year:'numeric'})}`;
-      }
-    } catch(e) { console.log('Error loading saved data'); }
-  } else {
-    const el = document.getElementById('screening-update-date');
-    if (el) el.textContent = 'datos 1T26 · presiona ⟳ para actualizar';
-  }
-}
-
-// INIT
+// ── INIT ──
 updateAlloc();
 setModo('reinv');
 loadSavedScreeningData();
-
-// Live JSON validation
-const updateTA = document.getElementById('update-input');
-if (updateTA) updateTA.addEventListener('input', validateUpdateJSON);
-
-// Update screening date dynamically
-const scrDateEl = document.getElementById('screening-update-date');
-if (scrDateEl) {
-  const now = new Date();
-  const stored = localStorage.getItem('fbx_last_update');
-  if (stored) {
-    const d = new Date(parseInt(stored));
-    scrDateEl.textContent = `actualizado ${d.toLocaleDateString('es-MX', {day:'numeric', month:'short', year:'numeric'})}`;
-  } else {
-    scrDateEl.textContent = 'datos 1T26 · actualiza con el botón ⟳';
-  }
-}
 </script>
 </body>
 </html>
